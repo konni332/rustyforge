@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 use std::process::Command;
-use crate::config::Forge;
-use crate::fs_utils::find_file;
+use crate::config::{Config};
+use crate::fs_utils::{find_file, find_r_paths};
+use crate::utils::is_valid_ldflag;
 
 pub fn find_o_files() -> Vec<PathBuf>{
     let mut cwd = std::env::current_dir().expect("Failed to get current directory");
@@ -25,12 +26,12 @@ pub fn find_o_files() -> Vec<PathBuf>{
     o_files
 }
 
-pub fn link(config: &Forge){
+pub fn link(config: &Config){
     let target_executable = if cfg!(target_os = "windows") {
-        format!("{}.exe", config.build.output)
+        format!("{}.exe", config.forge.build.output)
     }
     else { 
-        config.build.output.clone()
+        config.forge.build.output.clone()
     };
     
     let o_files = find_o_files();
@@ -41,11 +42,42 @@ pub fn link(config: &Forge){
     let target_path = cwd.join("forge").join(target_executable);
     
     let mut cmd = Command::new("gcc");
+    // add all object files
     for o_file in o_files {
         cmd.arg(o_file);
     }
+    
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    let r_paths = find_r_paths(&config);
+    // add all library paths
+    if let Some(dependencies) = &config.forge.dependencies {
+        
+        for lib_path in &dependencies.library_paths {
+            cmd.arg(format!("-L{}", lib_path));
+        }
+        
+        // add all rpaths (only linux and macos)
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        for path in &r_paths{
+            cmd.arg(format!("-Wl,-rpath={}", path.to_str().unwrap()).as_str());
+        }
+        
+        // add all libraries
+        for lib in &dependencies.libraries {
+            cmd.arg(format!("-l{}", lib));
+        }
+    }
     cmd.arg("-o").arg(target_path);
+    
+    // add user ldflags
+    if let Some(ldflags) = &config.forge.build.ldflags.clone() {
+        for flag in ldflags {
+            if is_valid_ldflag(flag) { cmd.arg(flag); }
+        }
+    }
+    
     let output = cmd.output().expect("Failed to run gcc");
+    
     if !output.status.success() {
         eprintln!("Hammer to rusty, linker failed: {}", String::from_utf8_lossy(&output.stderr))
     }

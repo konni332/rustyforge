@@ -1,31 +1,62 @@
-use std::collections::HashMap;
+use crate::utils::*;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use crate::fs_utils::*;
-use crate::config::Forge;
+use crate::config::{Config};
 use crate::fs_utils::FileError::FileNotFound;
 
 
-pub fn compile(config: &Forge) -> Result<(), String>{
+pub fn compile(config: &Config) -> Result<(), String>{
     // get all files to compile
-    let files = get_files_to_compile(config);
+    let files;
+    
+    if !config.args.rebuild_all {
+        files = get_files_to_compile(config);
+    }
+    else {
+        files = config.forge.build.src.clone();
+    }
     
     // compile all files (only gcc for now)
     println!("Melting...");
     let mut files_compiled = 0;
     for file in files {
-        let source_path = find_file(&file).unwrap();
-        let output_path = get_equivalent_forge_path(&source_path).unwrap();
+        let source_path = find_file(&file).expect(format!("Could not find file: {}", file).as_str());
+        let output_path = get_equivalent_forge_path(&source_path)?;
         
         let mut cmd = Command::new("gcc");
-        cmd.arg("-c")
-            .arg(source_path)
-            .arg("-o")
-            .arg(output_path);
-    
-        for include_dir in &config.build.include_dirs {
+        
+        // compiler flags based on the build type
+        if config.args.debug {
+            cmd.arg("-g").arg("-O0").arg("-Wall").arg("-Wextra").arg("-DDEBUG");
+        }
+        else if config.args.release {
+            cmd.arg("-O3").arg("-Wall").arg("-Wextra").arg("-DRELEASE").arg("-DNDEBUG");
+        }
+        
+        // check for user flags
+        if let Some(cflags) = config.forge.build.cflags.clone() {
+            for flag in cflags {
+                if is_valid_cflag(&flag) {cmd.arg(flag);}
+            }
+        }
+        
+        // compiler args
+        cmd.arg("-c").arg(source_path);
+        
+   
+        for include_dir in &config.forge.build.include_dirs {
             cmd.arg(format!("-I{}", include_dir));
         }
+        if let Some(dependencies) = &config.forge.dependencies {
+            for include_dir in &dependencies.include_dirs {
+                cmd.arg(format!("-I{}", include_dir));
+            }
+        }
+        // output flag
+        cmd.arg("-o").arg(output_path);
+        
+        
         
         let output = cmd.output().expect("Failed to execute gcc");
         
@@ -43,18 +74,22 @@ pub fn compile(config: &Forge) -> Result<(), String>{
 }
 
 
-fn get_files_to_compile(config: &Forge) -> Vec<String> {
+// TODO: dry run function
+
+fn get_files_to_compile(config: &Config) -> Vec<String> {
     let mut files = Vec::new();
     
     // TODO
     
-    for file in &config.build.src {
+    for file in &config.forge.build.src {
         // get the path to the .c file
-        let file_path = find_file(&file).expect(format!("Could not find file: {}", file).as_str());
+        let file_path = find_file(&file)
+            .expect(format!("Could not find file: {}", file).as_str());
         
         // get all .h files that are included in the .c file
         let rel_path: &Path = Path::new(file);
-        let h_files = parse_h_dependencies(rel_path, &config).expect("Could not resolve header dependencies");
+        let h_files = parse_h_dependencies(rel_path, &config)
+            .expect("Could not resolve header dependencies");
         
         // generate the equivalent forge path for the .c file
         let o_file = get_equivalent_forge_path(&file_path)
@@ -63,6 +98,7 @@ fn get_files_to_compile(config: &Forge) -> Vec<String> {
         // check if the .o file is newer than the .c file or any of the .h files if it exists
         match find_file(o_file.to_str().expect("Could not convert path to string")) {
             Ok(o_path) => {
+                
                 // TODO: replace with a hash of the file contents at some point
                 let c_file_time = get_timestamp(file_path);
                 let o_file_time = get_timestamp(o_path);
@@ -97,13 +133,13 @@ fn get_files_to_compile(config: &Forge) -> Vec<String> {
     files
 }
 
-fn gcc_mm(relpath: &Path, config: &Forge) -> Result<String, String> {
+fn gcc_mm(relpath: &Path, config: &Config) -> Result<String, String> {
     let mut cmd = Command::new("gcc");
     
     let gcc_path = normalize_path(relpath);
     
     cmd.arg("-MM").arg(gcc_path);
-    for dir in &config.build.include_dirs {
+    for dir in &config.forge.build.include_dirs {
         cmd.arg(format!("-I{}", dir.clone()));
     }
     
@@ -121,7 +157,7 @@ fn gcc_mm(relpath: &Path, config: &Forge) -> Result<String, String> {
     }
 }
 
-fn parse_h_dependencies(relpath: &Path, config: &Forge) -> Result<Vec<PathBuf>, String> {
+fn parse_h_dependencies(relpath: &Path, config: &Config) -> Result<Vec<PathBuf>, String> {
     let output = gcc_mm(relpath, config)?;
     let parts: Vec<&str> = output.split(':').collect();
     if parts.len() != 2 {

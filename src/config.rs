@@ -1,10 +1,17 @@
 use serde::Deserialize;
 use std::fs;
+use crate::ForgeArgs;
+
+pub struct Config {
+    pub forge: Forge,
+    pub args: ForgeArgs,
+}
 
 #[derive(Deserialize, Debug)]
 pub struct Forge {
     pub project: Project,
     pub build: Build,
+    pub dependencies: Option<Dependencies>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -21,6 +28,13 @@ pub struct Build {
     pub output: String,
     pub cflags: Option<Vec<String>>,
     pub ldflags: Option<Vec<String>>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Dependencies {
+    pub libraries: Vec<String>,
+    pub library_paths: Vec<String>,
+    pub include_dirs: Vec<String>,
 }
 
 pub fn parse_forge_file(path: &str) -> Result<Forge, Box<dyn std::error::Error>> {

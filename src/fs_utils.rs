@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{UNIX_EPOCH};
+use crate::config::Config;
 
 pub fn create_forge_dir() -> std::io::Result<()> {
     let dir_path = Path::new("forge");
@@ -53,4 +54,43 @@ pub fn normalize_path(path: &Path) -> String {
     else {
         s.replace("\\", "/")
     }
+}
+
+pub fn create_forge_dirs(name: &str) -> std::io::Result<()> {
+    let dir_path = Path::new("forge").join(name);
+    if !dir_path.exists() {
+        fs::create_dir_all(dir_path)?;
+    }
+    Ok(())   
+}
+
+pub fn find_r_paths(config: &Config) -> Vec<PathBuf> {
+    let mut paths: Vec<PathBuf> = Vec::new();
+    // only check if dependencies are set
+    match &config.forge.dependencies {
+        Some(deps) => {
+            // check for all paths
+            for path in &deps.library_paths {
+                // check for all libraries
+                for lib in &deps.libraries {
+                    // check if .so exists or lib.so exists
+                    let full_path = Path::new(path).join(format!("{}.so", lib));
+                    let alt_full_path = Path::new(path).join(format!("lib{}.so", lib));
+                    
+                    if full_path.exists() && !paths.contains(&PathBuf::from(path)) {
+                        let normalized_path = normalize_path(Path::new(path));
+                        paths.push(PathBuf::from(normalized_path));
+                        break;   
+                    }
+                    else if alt_full_path.exists() && !paths.contains(&PathBuf::from(path)) {
+                        let normalized_path = normalize_path(Path::new(path));
+                        paths.push(PathBuf::from(normalized_path));   
+                        break;   
+                    }
+                }
+            }
+        }
+        None => {}
+    }
+    paths
 }

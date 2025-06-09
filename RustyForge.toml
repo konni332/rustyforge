@@ -1,0 +1,10 @@
+[project]
+name = "my_project"
+type = "bin"
+
+[build]
+src = ["src/main.c", "src/runner.c" , "src/utils.c"]
+include_dirs = ["include"]
+output = "build/my_project"
+cflags = ["-O3", "-Wall"]
+ldflags = []

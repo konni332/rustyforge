@@ -21,7 +21,9 @@ pub fn find_file(filename: &str) -> Result<PathBuf, FileError> {
     let cwd = std::env::current_dir().map_err(|e| FileError::CwdError(format!("CWD Error: {}", e)))?;
     let full_path = cwd.join(filename);
     if full_path.exists() && full_path.is_file() {
-        Ok(full_path.canonicalize().map_err(|e| FileError::FileError(format!("File Error: {}", e)))?)
+        full_path.canonicalize().map_err(|e| FileError::FileError(format!("File Error: {}", e)))?;
+        let normalized_path = normalize_path(&full_path);
+        Ok(PathBuf::from(normalized_path))
     } else {
         Err(FileError::FileNotFound(format!("File not found: {}", filename)))
     }
@@ -43,4 +45,12 @@ pub fn get_equivalent_forge_path(input_path: &Path) -> Result<PathBuf, String> {
     Ok(forge_path)
 }
 
-
+pub fn normalize_path(path: &Path) -> String {
+    let s = path.to_string_lossy();
+    if s.starts_with(r"\\?\") {
+        s[4..].replace("\\","/")
+    }
+    else {
+        s.replace("\\", "/")
+    }
+}

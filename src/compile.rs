@@ -6,13 +6,44 @@ use crate::config::Forge;
 use crate::fs_utils::FileError::FileNotFound;
 
 
-pub fn compile(config: Forge) {
+pub fn compile(config: &Forge) -> Result<(), String>{
+    // get all files to compile
     let files = get_files_to_compile(config);
     
+    // compile all files (only gcc for now)
+    println!("Melting...");
+    let mut files_compiled = 0;
+    for file in files {
+        let source_path = find_file(&file).unwrap();
+        let output_path = get_equivalent_forge_path(&source_path).unwrap();
+        
+        let mut cmd = Command::new("gcc");
+        cmd.arg("-c")
+            .arg(source_path)
+            .arg("-o")
+            .arg(output_path);
+    
+        for include_dir in &config.build.include_dirs {
+            cmd.arg(format!("-I{}", include_dir));
+        }
+        
+        let output = cmd.output().expect("Failed to execute gcc");
+        
+        if !output.status.success() {
+            eprintln!("Furnace not hot enough! Error compiling file: {}:\n{}", file, String::from_utf8_lossy(&output.stderr));
+            return Err("Error compiling file".to_string());
+        }
+        else {
+            files_compiled += 1;
+            println!("[{}]: {}", files_compiled, file);
+        }
+    
+    }
+    Ok(())
 }
 
 
-fn get_files_to_compile(config: Forge) -> Vec<String> {
+fn get_files_to_compile(config: &Forge) -> Vec<String> {
     let mut files = Vec::new();
     
     // TODO
@@ -20,8 +51,11 @@ fn get_files_to_compile(config: Forge) -> Vec<String> {
     for file in &config.build.src {
         // get the path to the .c file
         let file_path = find_file(&file).expect(format!("Could not find file: {}", file).as_str());
+        
         // get all .h files that are included in the .c file
-        let h_files = parse_h_dependencies(&file_path, &config).expect("Could not resolve header dependencies");
+        let rel_path: &Path = Path::new(file);
+        let h_files = parse_h_dependencies(rel_path, &config).expect("Could not resolve header dependencies");
+        
         // generate the equivalent forge path for the .c file
         let o_file = get_equivalent_forge_path(&file_path)
             .expect(format!("Could not find equivalent forge path for file: {}", file).as_str());
@@ -66,7 +100,9 @@ fn get_files_to_compile(config: Forge) -> Vec<String> {
 fn gcc_mm(relpath: &Path, config: &Forge) -> Result<String, String> {
     let mut cmd = Command::new("gcc");
     
-    cmd.arg("-MM").arg(relpath);
+    let gcc_path = normalize_path(relpath);
+    
+    cmd.arg("-MM").arg(gcc_path);
     for dir in &config.build.include_dirs {
         cmd.arg(format!("-I{}", dir.clone()));
     }
@@ -113,7 +149,6 @@ fn parse_h_dependencies(relpath: &Path, config: &Forge) -> Result<Vec<PathBuf>, 
             deps_paths.push(abs_path);
         }
     }
-    
     Ok(deps_paths)
 }
 

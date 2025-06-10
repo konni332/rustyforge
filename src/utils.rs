@@ -1,4 +1,5 @@
-
+use std::path::Path;
+use std::process::Command;
 
 
 pub fn is_valid_cflag(flag: &str) -> bool {
@@ -60,3 +61,25 @@ pub fn is_valid_ldflag(flag: &str) -> bool {
     false
 }
 
+pub fn format_command(cmd: &Command) -> (String, Vec<String>) {
+    let program = cmd.get_program().to_string_lossy().to_string();
+    let args = cmd
+        .get_args()
+        .map(|arg| arg.to_string_lossy().to_string())
+        .collect();
+    
+    (program, args)
+}
+
+pub fn strip_cwd(arg: &str, cwd: &Path) -> String {
+    let arg_path = Path::new(arg);
+    if arg_path.is_absolute() && arg_path.starts_with(cwd) {
+        match arg_path.strip_prefix(cwd) { 
+            Ok(stripped) => stripped.to_string_lossy().to_string(),
+            Err(_) => arg.to_string(),
+        }
+    }
+    else { 
+        arg.to_string()
+    }
+}

@@ -9,6 +9,7 @@ mod linker;
 mod utils;
 mod hashes;
 mod tests;
+mod ui;
 
 use clap::{Parser};
 use serde::Deserialize;
@@ -44,6 +45,9 @@ pub struct ForgeArgs {
 
     #[arg(long)]
     pub config: Option<String>,
+    
+    #[arg(long = "verbose-hard", conflicts_with = "verbose")]
+    pub verbose_hard: bool,
 }
 
 

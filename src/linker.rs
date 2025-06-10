@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 use std::process::Command;
 use crate::config::{Config};
+#[allow(unused_imports)] // is imported for linux and macOS
 use crate::fs_utils::{find_file, find_r_paths};
-use crate::utils::is_valid_ldflag;
+use crate::utils::{is_valid_ldflag};
+use crate::ui::{verbose_command, verbose_command_hard};
 
 pub fn find_o_files(config: &Config) -> Vec<PathBuf>{
     let mut cwd = std::env::current_dir().expect("Failed to get current directory");
@@ -70,7 +72,7 @@ pub fn link(config: &Config){
             cmd.arg(format!("-L{}", lib_path));
         }
         
-        // add all rpaths (only linux and macos)
+        // add all rpaths (only linux and macOS)
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         for path in &r_paths{
             cmd.arg(format!("-Wl,-rpath={}", path.to_str().unwrap()).as_str());
@@ -88,6 +90,13 @@ pub fn link(config: &Config){
         for flag in ldflags {
             if is_valid_ldflag(flag) { cmd.arg(flag); }
         }
+    }
+    
+    if config.args.verbose {
+        verbose_command(&cmd);
+    }
+    else if config.args.verbose_hard { 
+        verbose_command_hard(&cmd);
     }
     
     let output = cmd.output().expect("Failed to run gcc");

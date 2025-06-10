@@ -4,6 +4,7 @@ use std::process::Command;
 use crate::fs_utils::*;
 use crate::config::{Config};
 use crate::hashes::{cache_hash, get_cached_hash, hash};
+use crate::ui::{print_files_compiled, print_melting, verbose_command, verbose_command_hard};
 
 pub fn compile(config: &Config) -> Result<(), String>{
     // get all files to compile
@@ -20,7 +21,7 @@ pub fn compile(config: &Config) -> Result<(), String>{
     let mut files_compiled = 0;
     for file in files {
         if files_compiled < 1 {
-            println!("Melting...")
+            print_melting();
         }
         let source_path = find_file(&file).expect(format!("Could not find file: {}", file).as_str());
         let output_path = get_equivalent_forge_path(&source_path, &config)?;
@@ -58,7 +59,12 @@ pub fn compile(config: &Config) -> Result<(), String>{
         cmd.arg("-o").arg(output_path);
         
         
-        
+        if config.args.verbose {
+            verbose_command(&cmd);
+        }
+        else if config.args.verbose_hard { 
+            verbose_command_hard(&cmd);
+        }
         let output = cmd.output().expect("Failed to execute gcc");
         
         if !output.status.success() {
@@ -67,7 +73,7 @@ pub fn compile(config: &Config) -> Result<(), String>{
         }
         else {
             files_compiled += 1;
-            println!("[{}]: {}", files_compiled, file);
+            print_files_compiled(files_compiled, &file);
         }
     
     }
@@ -119,6 +125,7 @@ fn get_files_to_compile(config: &Config) -> Vec<String> {
                 }
                 None => {
                     files.push(file.clone());
+                    continue;
                 }
             }
             
@@ -167,6 +174,13 @@ fn gcc_mm(relpath: &Path, config: &Config) -> Result<String, String> {
     cmd.arg("-MM").arg(gcc_path);
     for dir in &config.forge.build.include_dirs {
         cmd.arg(format!("-I{}", dir.clone()));
+    }
+    
+    if config.args.verbose {
+        verbose_command(&cmd);   
+    }
+    else if config.args.verbose_hard {
+        verbose_command_hard(&cmd);  
     }
     
     let output = cmd.output().map_err(|e| format!("Command Error: {}", e).to_string())?;

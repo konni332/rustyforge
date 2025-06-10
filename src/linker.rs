@@ -4,9 +4,16 @@ use crate::config::{Config};
 use crate::fs_utils::{find_file, find_r_paths};
 use crate::utils::is_valid_ldflag;
 
-pub fn find_o_files() -> Vec<PathBuf>{
+pub fn find_o_files(config: &Config) -> Vec<PathBuf>{
     let mut cwd = std::env::current_dir().expect("Failed to get current directory");
     cwd.push("forge");
+    
+    if config.args.debug {
+        cwd.push("debug");
+    }
+    else {
+        cwd.push("release");
+    }
     
     let mut o_files = Vec::new();
     
@@ -34,12 +41,19 @@ pub fn link(config: &Config){
         config.forge.build.output.clone()
     };
     
-    let o_files = find_o_files();
+    let o_files = find_o_files(&config);
     // TODO: Also link libs etc.
     
     println!("Forging...\n{}", target_executable);
     let cwd = std::env::current_dir().expect("Failed to get current directory");
-    let target_path = cwd.join("forge").join(target_executable);
+    
+    let target_path;
+    if config.args.debug {
+        target_path = cwd.join("forge").join("debug").join(target_executable);
+    }
+    else {
+        target_path = cwd.join("forge").join("release").join(target_executable);
+    }
     
     let mut cmd = Command::new("gcc");
     // add all object files

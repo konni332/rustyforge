@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{UNIX_EPOCH};
 use crate::config::Config;
+use crate::hashes::HashCache;
 
 pub fn create_forge_dir() -> std::io::Result<()> {
     let dir_path = Path::new("forge");
@@ -38,11 +39,18 @@ pub fn get_timestamp(absolut_path: PathBuf) -> Result<u64, String> {
     Ok(duration.as_secs())
 }
 
-pub fn get_equivalent_forge_path(input_path: &Path) -> Result<PathBuf, String> {
+pub fn get_equivalent_forge_path(input_path: &Path, config: &Config) -> Result<PathBuf, String> {
     let cwd = std::env::current_dir().map_err(|e| format!("CWD Error: {}", e))?;
     let file_stem = input_path.file_stem().and_then(|s| s.to_str())
         .ok_or("File stem not valid UTF-8")?;
-    let forge_path = cwd.join("forge").join(format!("{}.o", file_stem));
+    
+    let forge_path: PathBuf;
+    if config.args.debug {
+        forge_path = cwd.join("forge").join("debug").join(format!("{}.o", file_stem));
+    }
+    else {
+        forge_path = cwd.join("forge").join("release").join(format!("{}.o", file_stem));
+    }
     Ok(forge_path)
 }
 
@@ -64,6 +72,8 @@ pub fn create_forge_dirs(name: &str) -> std::io::Result<()> {
     Ok(())   
 }
 
+// allow dead code because this is only used on linux and macOS
+#[allow(dead_code)]
 pub fn find_r_paths(config: &Config) -> Vec<PathBuf> {
     let mut paths: Vec<PathBuf> = Vec::new();
     // only check if dependencies are set
@@ -93,4 +103,50 @@ pub fn find_r_paths(config: &Config) -> Vec<PathBuf> {
         None => {}
     }
     paths
+}
+
+pub fn init_hash_cache_json() -> Result<(), Box<dyn std::error::Error>> {
+    let json_path: PathBuf = std::env::current_dir()?
+        .join("forge")
+        .join(".forge")
+        .join("hash_cache.json");
+
+    if !json_path.exists() {
+        if let Some(parent) = json_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&json_path, "[]")?;
+    }
+
+    Ok(())
+}
+
+
+pub fn load_hash_cache_json() -> Result<Vec<HashCache>, Box<dyn std::error::Error>> {
+    let json_path = std::env::current_dir()?
+        .join("forge")
+        .join(".forge")
+        .join("hash_cache.json");
+    
+    let data = if Path::new(&json_path).exists() {
+        fs::read_to_string(json_path)?
+    }
+    else { 
+        "[]".to_string()
+    };
+    
+    let entries: Vec<HashCache> = serde_json::from_str(&data)?;
+    
+    Ok(entries)  
+}
+
+pub fn save_hash_cache_json(entries: &Vec<HashCache>) -> Result<(), Box<dyn std::error::Error>> {
+    let json_path = std::env::current_dir()?
+        .join("forge")
+        .join(".forge")
+        .join("hash_cache.json");
+    
+    let data = serde_json::to_string_pretty(entries)?;
+    fs::write(json_path, data)?;
+    Ok(())
 }

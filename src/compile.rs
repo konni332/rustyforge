@@ -3,8 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use crate::fs_utils::*;
 use crate::config::{Config};
-use crate::fs_utils::FileError::FileNotFound;
-
+use crate::hashes::{cache_hash, get_cached_hash, hash};
 
 pub fn compile(config: &Config) -> Result<(), String>{
     // get all files to compile
@@ -18,11 +17,13 @@ pub fn compile(config: &Config) -> Result<(), String>{
     }
     
     // compile all files (only gcc for now)
-    println!("Melting...");
     let mut files_compiled = 0;
     for file in files {
+        if files_compiled < 1 {
+            println!("Melting...")
+        }
         let source_path = find_file(&file).expect(format!("Could not find file: {}", file).as_str());
-        let output_path = get_equivalent_forge_path(&source_path)?;
+        let output_path = get_equivalent_forge_path(&source_path, &config)?;
         
         let mut cmd = Command::new("gcc");
         
@@ -92,43 +93,68 @@ fn get_files_to_compile(config: &Config) -> Vec<String> {
             .expect("Could not resolve header dependencies");
         
         // generate the equivalent forge path for the .c file
-        let o_file = get_equivalent_forge_path(&file_path)
+        let o_file = get_equivalent_forge_path(&file_path, &config)
             .expect(format!("Could not find equivalent forge path for file: {}", file).as_str());
         
-        // check if the .o file is newer than the .c file or any of the .h files if it exists
-        match find_file(o_file.to_str().expect("Could not convert path to string")) {
-            Ok(o_path) => {
-                
-                // TODO: replace with a hash of the file contents at some point
-                let c_file_time = get_timestamp(file_path);
-                let o_file_time = get_timestamp(o_path);
-                if c_file_time > o_file_time {
+        // check whether the .o file exists, if not, add it to the files to compile
+        if o_file.exists() {
+            // if yes, check the hashes of the .c and .h files
+            // if the hashes are different, add the .c file to the files to compile
+            let new_c_hash = hash(&file_path);
+            let cached_c_hash = get_cached_hash(&file_path);
+            match cached_c_hash { 
+                Some(cached_hash)  => {
+                    match new_c_hash {
+                        Ok(new_hash) => {
+                            if new_hash != cached_hash {
+                                files.push(file.clone());
+                                continue;
+                            }
+                        }
+                        Err(_) => {
+                            files.push(file.clone());
+                            continue;
+                        }
+                    }
+                }
+                None => {
                     files.push(file.clone());
-                    continue;
-                }
-                
-                for h_file in &h_files {
-                    let h_file_time = get_timestamp(h_file.clone());
-                    if h_file_time > o_file_time {
-                        files.push(file.clone());
-                        break;
-                    }
                 }
             }
-            Err(e) => {
-                match e { 
-                    // file does not exist? No problem, just add it to the list of files to compile
-                    FileNotFound(_) => {
-                        files.push(file.clone());
+            
+            for h_file in &h_files {
+                let new_h_hash = hash(&h_file);
+                let cached_h_hash = get_cached_hash(&h_file);
+
+                let header_changed = match cached_h_hash {
+                    Some(cached_hash) => {
+                        match new_h_hash {
+                            Ok(new_hash) => new_hash != cached_hash,
+                            Err(_) => true,
+                        }
                     },
-                    _ => {
-                        panic!("Could not find file: {}", file);
-                    }
+                    None => true,
+                };
+
+                if header_changed {
+                    files.push(file.clone());
+                    cache_hash(&h_file, hash(&h_file).unwrap());
+                    break; 
                 }
             }
+            
+            
         }
-        
+        else {
+            files.push(file.clone());
+        }
     }
+    // cache the new hashes
+    for file in &files {
+        let file_path = find_file(file).unwrap();
+        cache_hash(&file_path, hash(&file_path).unwrap());
+    }
+    
     
     files
 }

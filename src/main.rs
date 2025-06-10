@@ -1,5 +1,5 @@
 use crate::config::{parse_forge_file, Config};
-use crate::fs_utils::{create_forge_dir, create_forge_dirs};
+use crate::fs_utils::{create_forge_dir, create_forge_dirs, init_hash_cache_json};
 
 mod config;
 mod runner;
@@ -7,6 +7,8 @@ mod fs_utils;
 mod compile;
 mod linker;
 mod utils;
+mod hashes;
+mod tests;
 
 use clap::{Parser};
 use serde::Deserialize;
@@ -46,7 +48,11 @@ pub struct ForgeArgs {
 
 
 fn main() {
-    let args = ForgeArgs::parse();
+    let mut args = ForgeArgs::parse();
+    if !args.debug && !args.release {
+        args.debug = true;
+    }
+    
     // parse forge config file
     let mut cwd = std::env::current_dir().expect("Error getting current working directory.");
     
@@ -66,6 +72,10 @@ fn main() {
     
     // create the forge directory if it does not exist
     create_forge_dir().expect("Error creating forge directory.");
+    // create the .forge directory if it does not exist
+    create_forge_dirs(".forge").expect("Error creating .forge directory.");
+    // create the .forge/hash_cache.json file if it does not exist
+    init_hash_cache_json().expect("Error creating hash cache file.");
     // create the necessary subdirectories
     if config.args.debug {
         create_forge_dirs("debug").expect("Error creating debug directories.");

@@ -35,6 +35,7 @@ pub struct Dependencies {
     pub libraries: Vec<String>,
     pub library_paths: Vec<String>,
     pub include_dirs: Vec<String>,
+    pub posix_libraries: Vec<String>,
 }
 
 pub fn parse_forge_file(path: &str) -> Result<Forge, Box<dyn std::error::Error>> {

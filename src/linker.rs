@@ -82,6 +82,10 @@ pub fn link(config: &Config){
         for lib in &dependencies.libraries {
             cmd.arg(format!("-l{}", lib));
         }
+        
+        for lib in &dependencies.posix_libraries {
+            cmd.arg(format!("-l{}", lib));
+        }
     }
     cmd.arg("-o").arg(target_path);
     

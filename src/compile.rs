@@ -12,26 +12,9 @@ use colored::Colorize;
 
 pub fn compile(config: &Config) -> Result<(), String>{
     // get all files to compile
-    let files;
+    let files = get_files_to_compile(&config);
     
-    // if the command is rebuild or a --clean run, compile all files
-    // otherwise, only compile the files that have changed
-    match &config.args.command { 
-        Rebuild => {
-            files = get_files_to_compile(config);
-        },
-        Run(options) => {
-            if options.clean {
-                files = config.forge.build.src.clone();
-            }
-            else {
-                files = get_files_to_compile(config);
-            }
-        }
-        _ => {
-            files = get_files_to_compile(config);
-        }
-    };
+    
     
     // compile all files (only gcc for now)
     if !files.is_empty() {
@@ -57,7 +40,7 @@ pub fn compile(config: &Config) -> Result<(), String>{
             }
         }
         
-        cmd.arg("-c").arg(source_path);
+        cmd.arg("-c").arg(source_path.clone());
         
         for include_dir in &config.forge.build.include_dirs {
             cmd.arg(format!("-I{}", include_dir));
@@ -86,6 +69,8 @@ pub fn compile(config: &Config) -> Result<(), String>{
         else {
             println!("[{}]", &file.green())
         }
+        let hash = hash(&source_path).unwrap();
+        cache_hash(&source_path, hash);
         Ok(())
     })?;
     Ok(())
@@ -113,71 +98,90 @@ fn get_files_to_compile(config: &Config) -> Vec<String> {
         let o_file = get_equivalent_forge_path(&file_path, &config)
             .expect(format!("Could not find equivalent forge path for file: {}", file).as_str());
         
-        // check whether the .o file exists, if not, add it to the files to compile
-        if o_file.exists() {
-            // if yes, check the hashes of the .c and .h files
-            // if the hashes are different, add the .c file to the files to compile
-            let new_c_hash = hash(&file_path);
-            let cached_c_hash = get_cached_hash(&file_path);
-            match cached_c_hash { 
-                Some(cached_hash)  => {
-                    match new_c_hash {
-                        Ok(new_hash) => {
-                            if new_hash != cached_hash {
-                                files.push(file.clone());
-                                continue;
-                            }
-                        }
-                        Err(_) => {
+        let rebuild_all = match &config.args.command { 
+            Rebuild => true,
+            Run(options) => {
+                options.clean
+            },
+            _ => false,
+        };
+        
+        
+        
+        let new_c_hash = hash(&file_path); // new .c file hashes are cached after compilation
+        let cached_c_hash = get_cached_hash(&file_path);
+        
+        
+        
+        let mut pushed_c = false;
+        
+        if rebuild_all {
+            files.push(file.clone());
+            pushed_c = true;
+        }
+        
+        if !o_file.exists() && !pushed_c{
+            files.push(file.clone());
+            pushed_c = true;
+        }
+        
+        let cached_c_hash = match cached_c_hash {
+            Some(hash) => hash,
+            None => {
+                if !pushed_c {
+                    files.push(file.clone());
+                    pushed_c = true;
+                }
+                "".to_string() // not going to matter, because we compile it anyway
+            }
+        };
+        
+        match new_c_hash { 
+            Ok(hash)  if hash != cached_c_hash && !pushed_c => {
+                files.push(file.clone());
+                pushed_c = true;
+            }
+            Err(_) => {
+                if !pushed_c {
+                    files.push(file.clone());
+                    pushed_c = true;
+                }
+            }
+            _ => {}
+        }
+        
+        for h_file in h_files {
+            let new_h_hash = hash(&h_file);
+            let cached_h_hash = get_cached_hash(&h_file);
+            match &new_h_hash { 
+                Ok(hash) if!pushed_c => {
+                    match cached_h_hash { 
+                        Some(cached_hash) if hash.as_str() != cached_hash.as_str() => {
                             files.push(file.clone());
-                            continue;
+                            pushed_c = true;
+                        },
+                        None => {
+                            files.push(file.clone());
+                            pushed_c = true;   
                         }
+                        _ => {}
                     }
                 }
-                None => {
-                    files.push(file.clone());
-                    continue;
+                Err(_) => {
+                    if !pushed_c {
+                        files.push(file.clone());
+                        pushed_c = true;   
+                    }
                 }
+                _ => {}
             }
-            
-            for h_file in &h_files {
-                let new_h_hash = hash(&h_file);
-                let cached_h_hash = get_cached_hash(&h_file);
-
-                let header_changed = match cached_h_hash {
-                    Some(cached_hash) => {
-                        match new_h_hash {
-                            Ok(new_hash) => new_hash != cached_hash,
-                            Err(_) => true,
-                        }
-                    },
-                    None => true,
-                };
-
-                if header_changed {
-                    files.push(file.clone());
-                    cache_hash(&h_file, hash(&h_file).unwrap());
-                    break; 
-                }
+            if let Ok(ref hash) = new_h_hash {
+                cache_hash(&h_file, hash.clone());
             }
-            
-            for h_file in &h_files {
-                cache_hash(&h_file, hash(&h_file).unwrap());
-            }
-            
-            
         }
-        else {
-            files.push(file.clone());
-        }
+        
     }
-    // cache the new hashes
-    for file in &files {
-        let file_path = find_file(file).unwrap();
-        cache_hash(&file_path, hash(&file_path).unwrap());
-    }
-    
-    
+
     files
 }
 

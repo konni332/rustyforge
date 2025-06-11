@@ -5,7 +5,7 @@ use crate::config::{Build, Config, Forge, Project};
 use crate::hashes::HashCache;
 use anyhow::{Result, bail};
 
-pub fn create_forge_dir() -> std::io::Result<()> {
+pub fn create_forge_dir() -> Result<()> {
     let dir_path = Path::new("forge");
     if !dir_path.exists() {
         fs::create_dir_all(dir_path)?;

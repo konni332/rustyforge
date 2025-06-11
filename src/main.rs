@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::path::Path;
 use crate::config::{parse_forge_file, Config};
-use crate::fs_utils::{ensure_necessary_files, init_forge_structure};
+use crate::fs_utils::{create_forge_dirs, ensure_necessary_files, init_forge_structure, init_hash_cache_json};
 use crate::arguments::ForgeArgs;
 use clap::Parser;
 use crate::arguments::Command::{Build, Run, Rebuild, Clean, Init};
@@ -27,6 +27,7 @@ mod arguments;
 fn main() {
     // parse command line arguments
     let mut args = ForgeArgs::parse();
+    // set default to debug if no other option is given
     if !&args.debug && !&args.release {
         args.debug = true;
     }
@@ -54,7 +55,20 @@ fn main() {
             forge,
             args: args.clone(),
         };
-
+        
+        if args.debug {
+            if let Err(e) = create_forge_dirs("debug") {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
+        }
+        else if args.release {
+            if let Err(e) = create_forge_dirs("release") {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            }
+        }
+        
         match &args.command {
             Build |
             Rebuild => {
@@ -78,9 +92,16 @@ fn main() {
                     std::fs::remove_dir_all(path).expect("Error removing release directory.");
                 }
                 let json_path = cwd.join("forge").join(".forge").join("hash_cache.json");
-                std::fs::remove_file(json_path).expect("Error removing hash cache file.")
+                std::fs::remove_file(json_path).expect("Error removing hash cache file.");
+                // reinitialize empty hash_cache.json file
+                if let Err(e) = init_hash_cache_json(){
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
             }
-            _ => {} // not necessary, just for compiler error suppression
+            _ => {
+                print!("Hi! This will never be printed.")
+            } // not necessary, just for compiler error suppression
         }
     }
     else {

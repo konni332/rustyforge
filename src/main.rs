@@ -70,9 +70,12 @@ fn main() {
         }
         
         match &args.command {
-            Build |
+            Build => {
+                compile(&config).expect("Error compiling.");
+                link(&config);
+            }
             Rebuild => {
-
+                clean(&config, &cwd);
                 compile(&config).expect("Error compiling.");
                 link(&config);
             }
@@ -82,22 +85,7 @@ fn main() {
                 execute_target(&config, &cwd);
             }
             Clean => {
-                print_cleaning();
-                if config.args.debug {
-                    let path = cwd.join("forge").join("debug");
-                    std::fs::remove_dir_all(path).expect("Error removing debug directory.");
-                }
-                else if config.args.release {
-                    let path = cwd.join("forge").join("release");
-                    std::fs::remove_dir_all(path).expect("Error removing release directory.");
-                }
-                let json_path = cwd.join("forge").join(".forge").join("hash_cache.json");
-                std::fs::remove_file(json_path).expect("Error removing hash cache file.");
-                // reinitialize empty hash_cache.json file
-                if let Err(e) = init_hash_cache_json(){
-                    eprintln!("Error: {}", e);
-                    std::process::exit(1);
-                }
+                clean(&config, &cwd);
             }
             _ => {
                 print!("Hi! This will never be printed.")
@@ -140,4 +128,34 @@ fn execute_target(config: &Config, cwd: &Path) {
 
     std::io::stdout().write_all(&output.stdout).expect("Error writing stdout.");
     std::io::stderr().write_all(&output.stderr).expect("Error writing stderr.");
+}
+
+fn clean(config: &Config, cwd: &Path) {
+    print_cleaning();
+    if config.args.debug {
+        let path = cwd.join("forge").join("debug");
+        std::fs::remove_dir_all(path).expect("Error removing debug directory.");
+    }
+    else if config.args.release {
+        let path = cwd.join("forge").join("release");
+        std::fs::remove_dir_all(path).expect("Error removing release directory.");
+    }
+    let json_path = cwd.join("forge").join(".forge").join("hash_cache.json");
+    std::fs::remove_file(json_path).expect("Error removing hash cache file.");
+    // reinitialize empty hash_cache.json file
+    if let Err(e) = init_hash_cache_json(){
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
+    // reinitialize forge directory
+    if config.args.debug {
+        if let Err(e) = create_forge_dirs("debug") {
+            eprintln!("Error: {}", e);
+        }
+    }
+    else if config.args.release {
+        if let Err(e) = create_forge_dirs("release") {
+            eprintln!("Error: {}", e);
+        }
+    }
 }

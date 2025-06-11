@@ -84,7 +84,7 @@ pub fn compile(config: &Config) -> Result<(), String>{
             return Err("Error compiling file".to_string());
         }
         else {
-            println!("[{}]: {}", (index + 1).to_string().green(), &file.green())
+            println!("[{}]", &file.green())
         }
         Ok(())
     })?;

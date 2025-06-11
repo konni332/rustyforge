@@ -1,6 +1,7 @@
 use crate::utils::*;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use crate::arguments::Command::{Rebuild, Run};
 use crate::fs_utils::*;
 use crate::config::{Config};
 use crate::hashes::{cache_hash, get_cached_hash, hash};
@@ -10,12 +11,24 @@ pub fn compile(config: &Config) -> Result<(), String>{
     // get all files to compile
     let files;
     
-    if !config.args.rebuild_all {
-        files = get_files_to_compile(config);
-    }
-    else {
-        files = config.forge.build.src.clone();
-    }
+    // if the command is rebuild or a --clean run, compile all files
+    // otherwise, only compile the files that have changed
+    match &config.args.command { 
+        Rebuild => {
+            files = get_files_to_compile(config);
+        },
+        Run(options) => {
+            if options.clean {
+                files = config.forge.build.src.clone();
+            }
+            else {
+                files = get_files_to_compile(config);
+            }
+        }
+        _ => {
+            files = get_files_to_compile(config);
+        }
+    };
     
     // compile all files (only gcc for now)
     let mut files_compiled = 0;
@@ -148,6 +161,10 @@ fn get_files_to_compile(config: &Config) -> Vec<String> {
                     cache_hash(&h_file, hash(&h_file).unwrap());
                     break; 
                 }
+            }
+            
+            for h_file in &h_files {
+                cache_hash(&h_file, hash(&h_file).unwrap());
             }
             
             

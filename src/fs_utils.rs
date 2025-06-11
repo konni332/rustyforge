@@ -1,7 +1,8 @@
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{UNIX_EPOCH};
-use crate::config::Config;
+use crate::config::{Build, Config, Forge, Project};
 use crate::hashes::HashCache;
 
 pub fn create_forge_dir() -> std::io::Result<()> {
@@ -148,5 +149,44 @@ pub fn save_hash_cache_json(entries: &Vec<HashCache>) -> Result<(), Box<dyn std:
     
     let data = serde_json::to_string_pretty(entries)?;
     fs::write(json_path, data)?;
+    Ok(())
+}
+pub fn init_default_toml() -> Result<(), Box<dyn std::error::Error>> {
+    let cwd = std::env::current_dir()?;
+
+    let dir_name = cwd
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
+
+    let default = Forge {
+        project: Project {
+            name: dir_name.to_string(),
+            project_type: "bin".to_string(),
+        },
+        build: Build {
+            src: vec!["main.c".into()],
+            include_dirs: vec!["include".into()],
+            output: dir_name.to_string(),
+            cflags: None,
+            ldflags: None,
+        },
+        dependencies: None,
+    };
+
+    let toml_string = toml::to_string_pretty(&default)?;
+
+    let path = cwd.join("RustyForge.toml");
+
+    // explizit vorher löschen, falls Datei existiert und evtl. gesperrt ist
+    if path.exists() {
+        fs::remove_file(&path)?; // ← kann Fehler werfen, wenn Datei gelockt ist
+    }
+
+    let mut file = fs::File::create(&path)?;
+    file.write_all(toml_string.as_bytes())?;
+    file.sync_all()?; // ← stellt sicher, dass alles auf die Platte geschrieben wurde
+
+    println!("Created default RustyForge.toml at {}", path.display());
     Ok(())
 }

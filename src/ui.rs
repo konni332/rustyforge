@@ -37,6 +37,3 @@ pub fn print_melting(){
 pub fn print_cleaning(){
     println!("{}", "Cleaning...".bold())   
 }
-
-
-

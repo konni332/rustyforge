@@ -3,6 +3,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use crate::config::{Build, Config, Forge, Project};
 use crate::hashes::HashCache;
+use anyhow::{Result, bail};
 
 pub fn create_forge_dir() -> std::io::Result<()> {
     let dir_path = Path::new("forge");
@@ -56,7 +57,7 @@ pub fn normalize_path(path: &Path) -> String {
     }
 }
 
-pub fn create_forge_dirs(name: &str) -> std::io::Result<()> {
+pub fn create_forge_dirs(name: &str) -> Result<()> {
     let dir_path = Path::new("forge").join(name);
     if !dir_path.exists() {
         fs::create_dir_all(dir_path)?;
@@ -97,7 +98,7 @@ pub fn find_r_paths(config: &Config) -> Vec<PathBuf> {
     paths
 }
 
-pub fn init_hash_cache_json() -> Result<(), std::io::Error> {
+pub fn init_hash_cache_json() -> Result<()> {
     let json_path: PathBuf = std::env::current_dir()?
         .join("forge")
         .join(".forge")
@@ -142,7 +143,7 @@ pub fn save_hash_cache_json(entries: &Vec<HashCache>) -> Result<(), Box<dyn std:
     fs::write(json_path, data)?;
     Ok(())
 }
-pub fn init_default_toml() -> Result<(), std::io::Error> {
+pub fn init_default_toml() -> Result<()> {
     let cwd = std::env::current_dir()?;
 
     let dir_name = cwd
@@ -183,7 +184,7 @@ pub fn init_default_toml() -> Result<(), std::io::Error> {
 }
 
 
-pub fn ensure_necessary_files() -> std::io::Result<()> {
+pub fn ensure_necessary_files() -> Result<()> {
     let cwd = std::env::current_dir()?; // current working directory
     let forge_dir = cwd.join("forge"); // general forge directory
     let forge_dir_hidden = forge_dir.join(".forge"); // hidden forge directory
@@ -197,15 +198,16 @@ pub fn ensure_necessary_files() -> std::io::Result<()> {
         &toml_path,
     ];
     // check if all required files exist
-    if required_paths.iter().any(|p| !p.exists()) {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::NotFound, "Required files not found",
-        ));   
+    if let Some(missing_path) = required_paths.iter().find(|p| !p.exists()) {
+        bail!(
+            "Missing required file: {}\n\nPlease run `rustyforge init` to initialize the forge directory.",
+            missing_path.display()
+        )
     }
     Ok(())
 }
 
-pub fn init_forge_structure() -> std::io::Result<()> {
+pub fn init_forge_structure() -> Result<()> {
     // create forge files
     create_forge_dir()?;
     create_forge_dirs(".forge")?;

@@ -9,6 +9,7 @@ use crate::compile::compile;
 use crate::linker::link;
 use crate::ui::{print_cleaning, verbose_command, verbose_command_hard};
 
+
 mod config;
 mod runner;
 mod fs_utils;
@@ -23,20 +24,29 @@ mod arguments;
 
 
 
-fn main() -> std::io::Result<()>{
+fn main() {
     // parse command line arguments
     let mut args = ForgeArgs::parse();
     if !&args.debug && !&args.release {
         args.debug = true;
     }
-    
+
     // get the current working directory
-    let cwd = std::env::current_dir()?;
+    let cwd = match std::env::current_dir() {
+        Ok(path) => path,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
+    };
     
     let config: Config;
     // don't check project structure if init command is used (obviously)
     if args.command != Init {
-        ensure_necessary_files()?;
+        if let Err(e) = ensure_necessary_files() {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
         let toml_path = Path::new("RustyForge.toml");
         let forge = parse_forge_file(toml_path.to_str().unwrap())
             .expect("Error parsing forge file. Format might be wrong.");
@@ -74,9 +84,11 @@ fn main() -> std::io::Result<()>{
         }
     }
     else {
-        init_forge_structure()?;
+        if let Err(e) = init_forge_structure() {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
     }
-    Ok(())
 }
 
 fn execute_target(config: &Config, cwd: &Path) {

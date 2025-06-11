@@ -1,18 +1,20 @@
 use std::process::Command;
 use colored::Colorize;
-use crate::utils::format_command;
+use crate::utils::{format_command, strip_cwd};
 
 pub fn verbose_command(cmd: &Command) {
     let (program, args) = format_command(cmd);
     let cwd = std::env::current_dir().expect("Could not get current working directory.");
     let clean_args = args
         .iter()
-        .map(|a| crate::utils::strip_cwd(a, &cwd))
+        .map(|a| strip_cwd(a, &cwd))
         .map(|s| if s.contains(" ") { format!("\"{}\"", s) } else { s })
         .collect::<Vec<String>>()
         .join(" ");
-
-    println!("[{}] Running: {} {}", "verbose".bold().bright_yellow() ,program, clean_args);
+    
+    let clean_program = strip_cwd(&program, &cwd);
+    
+    println!("[{}] Running: {} {}", "verbose".bold().bright_yellow() ,clean_program, clean_args);
 }
 
 pub fn verbose_command_hard(cmd: &Command) {

@@ -8,7 +8,7 @@ use clap::{Parser, Subcommand, Args};
     author = "<konni332>",
     subcommand_required = true,
     arg_required_else_help = true,
-    override_usage = "rustyforge <COMMAND> [OPTIONS]"
+    override_usage = "rustyforge <COMMAND> [OPTIONS] [-- <ARGS for your program>]"
 )]
 pub struct ForgeArgs {
     /// show verbose output
@@ -44,6 +44,8 @@ pub enum Command {
 pub struct RunOptions {
     #[arg(long)]
     pub clean: bool,
+    #[arg(value_name = "ARGS", trailing_var_arg = true)]
+    pub args: Vec<String>,
 }
 
 

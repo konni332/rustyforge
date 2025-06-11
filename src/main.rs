@@ -116,7 +116,14 @@ fn execute_target(config: &Config, cwd: &Path) {
     }
     exe_path = exe_path.join(exe_name);
     let mut cmd = std::process::Command::new(exe_path);
-
+    
+    match &config.args.command { 
+        Run(run_options) => {
+            cmd.args(run_options.args.clone());
+        }
+        _ => {}
+    }
+    
     if config.args.verbose {
         verbose_command(&cmd);
     }

@@ -4,7 +4,7 @@ use crate::config::{Config};
 #[allow(unused_imports)] // is imported for linux and macOS
 use crate::fs_utils::{find_file, find_r_paths};
 use crate::utils::{is_valid_ldflag};
-use crate::ui::{verbose_command, verbose_command_hard};
+use crate::ui::{print_forging, verbose_command, verbose_command_hard};
 
 pub fn find_o_files(config: &Config) -> Vec<PathBuf>{
     let mut cwd = std::env::current_dir().expect("Failed to get current directory");
@@ -46,7 +46,7 @@ pub fn link(config: &Config){
     let o_files = find_o_files(&config);
     // TODO: Also link libs etc.
     
-    println!("Forging...\n{}", target_executable);
+    print_forging(&target_executable);
     let cwd = std::env::current_dir().expect("Failed to get current directory");
     
     let target_path;

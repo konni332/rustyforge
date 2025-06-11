@@ -1,3 +1,5 @@
+use std::io::Write;
+use std::path::Path;
 use crate::config::{parse_forge_file, Config};
 use crate::fs_utils::{create_forge_dir, create_forge_dirs, init_default_toml, init_hash_cache_json};
 use crate::arguments::ForgeArgs;
@@ -5,6 +7,7 @@ use clap::Parser;
 use crate::arguments::Command::{Build, Run, Rebuild, Clean, Init};
 use crate::compile::compile;
 use crate::linker::link;
+use crate::ui::{print_cleaning, verbose_command, verbose_command_hard};
 
 mod config;
 mod runner;
@@ -84,8 +87,10 @@ fn main() {
         Run(_) => {
             compile(&config).expect("Error compiling.");
             link(&config);
+            execute_target(&config, &cwd);
         }
         Clean => {
+            print_cleaning();
             if config.args.debug {
                 let path = cwd.join("forge").join("debug");
                 std::fs::remove_dir_all(path).expect("Error removing debug directory.");
@@ -101,4 +106,34 @@ fn main() {
     }
     
     
+}
+
+fn execute_target(config: &Config, cwd: &Path) {
+    let mut exe_name = config.forge.build.output.clone();
+
+    // add .exe extension on windows
+    #[cfg(target_os = "windows")]
+    exe_name.push_str(".exe");
+
+    let mut exe_path = cwd.join("forge");
+    if config.args.debug {
+        exe_path.push("debug");
+    }
+    else if config.args.release {
+        exe_path.push("release");
+    }
+    exe_path.join(exe_name);
+    let mut cmd = std::process::Command::new(exe_path);
+
+    if config.args.verbose {
+        verbose_command(&cmd);
+    }
+    else if config.args.verbose_hard {
+        verbose_command_hard(&cmd);
+    }
+
+    let output = cmd.output().expect("Error running executable.");
+
+    std::io::stdout().write_all(&output.stdout).expect("Error writing stdout.");
+    std::io::stderr().write_all(&output.stderr).expect("Error writing stderr.");
 }

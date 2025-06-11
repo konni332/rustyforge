@@ -12,7 +12,7 @@ pub fn verbose_command(cmd: &Command) {
         .collect::<Vec<String>>()
         .join(" ");
 
-    println!("[verbose] Running: {} {}", program, clean_args);
+    println!("[{}] Running: {} {}", "verbose".bold().bright_yellow() ,program, clean_args);
 }
 
 pub fn verbose_command_hard(cmd: &Command) {
@@ -23,23 +23,19 @@ pub fn verbose_command_hard(cmd: &Command) {
         .collect::<Vec<String>>()
         .join(" ");
 
-    println!("[verbose-hard] Running (raw): {} {}", program, args_string);
+    println!("[{}] Running (raw): {} {}", "verbose-hard".bold().bright_red(),program, args_string);
 }
 
-pub fn print_forging(){
-    println!("{}", "Forging...".bold().white())
+pub fn print_forging(target: &str){
+    println!("\x1b[1;38;5;208mForging...\n{}\x1b[0m", target);
 }
 
 pub fn print_melting(){
-    println!("{}", "Melting...".bold().red())
-}
-
-pub fn print_smelting(){
-    todo!()
+    println!("{}", "\x1b[38;5;208mMelting...\x1b[0m".bold())
 }
 
 pub fn print_cleaning(){
-    todo!()
+    println!("{}", "Cleaning...".bold())   
 }
 
 

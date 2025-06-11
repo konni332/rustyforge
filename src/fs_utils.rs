@@ -97,7 +97,7 @@ pub fn find_r_paths(config: &Config) -> Vec<PathBuf> {
     paths
 }
 
-pub fn init_hash_cache_json() -> Result<(), Box<dyn std::error::Error>> {
+pub fn init_hash_cache_json() -> Result<(), std::io::Error> {
     let json_path: PathBuf = std::env::current_dir()?
         .join("forge")
         .join(".forge")
@@ -142,7 +142,7 @@ pub fn save_hash_cache_json(entries: &Vec<HashCache>) -> Result<(), Box<dyn std:
     fs::write(json_path, data)?;
     Ok(())
 }
-pub fn init_default_toml() -> Result<(), Box<dyn std::error::Error>> {
+pub fn init_default_toml() -> Result<(), std::io::Error> {
     let cwd = std::env::current_dir()?;
 
     let dir_name = cwd
@@ -165,19 +165,54 @@ pub fn init_default_toml() -> Result<(), Box<dyn std::error::Error>> {
         dependencies: None,
     };
 
-    let toml_string = toml::to_string_pretty(&default)?;
+    let toml_string = toml::to_string_pretty(&default)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     let path = cwd.join("RustyForge.toml");
 
-    // explizit vorher löschen, falls Datei existiert und evtl. gesperrt ist
     if path.exists() {
-        fs::remove_file(&path)?; // ← kann Fehler werfen, wenn Datei gelockt ist
+        fs::remove_file(&path)?; 
     }
 
     let mut file = fs::File::create(&path)?;
     file.write_all(toml_string.as_bytes())?;
-    file.sync_all()?; // ← stellt sicher, dass alles auf die Platte geschrieben wurde
+    file.sync_all()?; 
 
     println!("Created default RustyForge.toml at {}", path.display());
     Ok(())
+}
+
+
+pub fn ensure_necessary_files() -> std::io::Result<()> {
+    let cwd = std::env::current_dir()?; // current working directory
+    let forge_dir = cwd.join("forge"); // general forge directory
+    let forge_dir_hidden = forge_dir.join(".forge"); // hidden forge directory
+    let hash_cache_path = forge_dir_hidden.join("hash_cache.json");
+    let toml_path = cwd.join("RustyForge.toml");
+    
+    let required_paths = [
+        &forge_dir,
+        &forge_dir_hidden,
+        &hash_cache_path,
+        &toml_path,
+    ];
+    // check if all required files exist
+    if required_paths.iter().any(|p| !p.exists()) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound, "Required files not found",
+        ));   
+    }
+    Ok(())
+}
+
+pub fn init_forge_structure() -> std::io::Result<()> {
+    // create forge files
+    create_forge_dir()?;
+    create_forge_dirs(".forge")?;
+    init_hash_cache_json()?;
+    init_default_toml()?;
+    // create the default project structure
+    fs::create_dir_all("src")?;
+    fs::create_dir_all("include")?;
+    Ok(())  
 }

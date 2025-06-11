@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::path::Path;
 use crate::config::{parse_forge_file, Config};
-use crate::fs_utils::{create_forge_dir, create_forge_dirs, init_default_toml, init_hash_cache_json};
+use crate::fs_utils::{ensure_necessary_files, init_forge_structure};
 use crate::arguments::ForgeArgs;
 use clap::Parser;
 use crate::arguments::Command::{Build, Run, Rebuild, Clean, Init};
@@ -26,73 +26,56 @@ mod arguments;
 fn main() -> std::io::Result<()>{
     // parse command line arguments
     let mut args = ForgeArgs::parse();
-    if !args.debug && !args.release {
+    if !&args.debug && !&args.release {
         args.debug = true;
     }
     
-    // parse forge config file
-    let cwd = std::env::current_dir().expect("Error getting current working directory.");
+    // get the current working directory
+    let cwd = std::env::current_dir()?;
     
-    let toml_path = cwd.join("RustyForge.toml");
-    
-    // if the command is init, create the forge directory and the forge file
-    if args.command == Init {
-        // create the forge directory if it does not exist
-        create_forge_dir().expect("Error creating forge directory.");
-        create_forge_dirs(".forge").expect("Error creating .forge directory.");
-        init_hash_cache_json().expect("Error creating hash cache file.");
-        
-        // init a default RustForge.toml file
-        init_default_toml().expect("Error creating default forge file.");
-        
-        // init include/ and src/ directories
-        std::fs::create_dir_all(cwd.join("include")).expect("Error creating include directory.");
-        std::fs::create_dir_all(cwd.join("src")).expect("Error creating src directory.");
-        return Ok(())
-    }
-    
-    if !toml_path.exists() {
-        eprintln!("No RustyForge.toml file found. Use rustyforge init to create one.");
-        std::process::exit(1);
-    }
-    
-    
-    let forge = parse_forge_file(toml_path.to_str().unwrap())
-        .expect("Error parsing forge file. Format might be wrong.");
-    
-    let config = Config {
-        forge,
-        args,
-    };
-    
-    
-    match &config.args.command {
-        Build |
-        Rebuild => {
-            compile(&config).expect("Error compiling.");
-            link(&config);
-        }
-        Run(_) => {
-            compile(&config).expect("Error compiling.");
-            link(&config);
-            execute_target(&config, &cwd);
-        }
-        Clean => {
-            print_cleaning();
-            if config.args.debug {
-                let path = cwd.join("forge").join("debug");
-                std::fs::remove_dir_all(path).expect("Error removing debug directory.");
+    let config: Config;
+    // don't check project structure if init command is used (obviously)
+    if args.command != Init {
+        ensure_necessary_files()?;
+        let toml_path = Path::new("RustyForge.toml");
+        let forge = parse_forge_file(toml_path.to_str().unwrap())
+            .expect("Error parsing forge file. Format might be wrong.");
+        config = Config {
+            forge,
+            args: args.clone(),
+        };
+
+        match &args.command {
+            Build |
+            Rebuild => {
+
+                compile(&config).expect("Error compiling.");
+                link(&config);
             }
-            else if config.args.release {
-                let path = cwd.join("forge").join("release");
-                std::fs::remove_dir_all(path).expect("Error removing release directory.");
+            Run(_) => {
+                compile(&config).expect("Error compiling.");
+                link(&config);
+                execute_target(&config, &cwd);
             }
-            let json_path = cwd.join("forge").join(".forge").join("hash_cache.json");
-            std::fs::remove_file(json_path).expect("Error removing hash cache file.")
+            Clean => {
+                print_cleaning();
+                if config.args.debug {
+                    let path = cwd.join("forge").join("debug");
+                    std::fs::remove_dir_all(path).expect("Error removing debug directory.");
+                }
+                else if config.args.release {
+                    let path = cwd.join("forge").join("release");
+                    std::fs::remove_dir_all(path).expect("Error removing release directory.");
+                }
+                let json_path = cwd.join("forge").join(".forge").join("hash_cache.json");
+                std::fs::remove_file(json_path).expect("Error removing hash cache file.")
+            }
+            _ => {} // not necessary, just for compiler error suppression
         }
-        Init => {}
     }
-    
+    else {
+        init_forge_structure()?;
+    }
     Ok(())
 }
 

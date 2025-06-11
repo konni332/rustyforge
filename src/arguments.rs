@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand, Args};
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(
     name = "rustyforge",
     about = "A simple, lightweight build tool for C",
@@ -31,7 +31,7 @@ pub struct ForgeArgs {
     pub command: Command,
 }
 
-#[derive(Subcommand, Debug, PartialEq)]
+#[derive(Subcommand, Debug, PartialEq, Clone)]
 pub enum Command {
     Build,
     Clean,
@@ -40,7 +40,7 @@ pub enum Command {
     Init,
 }
 
-#[derive(Args, Debug, PartialEq)]
+#[derive(Args, Debug, PartialEq, Clone)]
 pub struct RunOptions {
     #[arg(long)]
     pub clean: bool,

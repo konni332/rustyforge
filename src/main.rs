@@ -23,7 +23,8 @@ mod arguments;
 
 
 
-fn main() {
+fn main() -> std::io::Result<()>{
+    // parse command line arguments
     let mut args = ForgeArgs::parse();
     if !args.debug && !args.release {
         args.debug = true;
@@ -34,7 +35,7 @@ fn main() {
     
     let toml_path = cwd.join("RustyForge.toml");
     
-    // if command is init, create the forge directory and the forge file
+    // if the command is init, create the forge directory and the forge file
     if args.command == Init {
         // create the forge directory if it does not exist
         create_forge_dir().expect("Error creating forge directory.");
@@ -47,7 +48,7 @@ fn main() {
         // init include/ and src/ directories
         std::fs::create_dir_all(cwd.join("include")).expect("Error creating include directory.");
         std::fs::create_dir_all(cwd.join("src")).expect("Error creating src directory.");
-        return;
+        return Ok(())
     }
     
     if !toml_path.exists() {
@@ -64,19 +65,6 @@ fn main() {
         args,
     };
     
-    // create the forge directory if it does not exist
-    create_forge_dir().expect("Error creating forge directory.");
-    // create the .forge directory if it does not exist
-    create_forge_dirs(".forge").expect("Error creating .forge directory.");
-    // create the .forge/hash_cache.json file if it does not exist
-    init_hash_cache_json().expect("Error creating hash cache file.");
-    // create the necessary subdirectories
-    if config.args.debug {
-        create_forge_dirs("debug").expect("Error creating debug directories.");
-    }
-    else if config.args.release {
-        create_forge_dirs("release").expect("Error creating release directories.");
-    }
     
     match &config.args.command {
         Build |
@@ -105,7 +93,7 @@ fn main() {
         Init => {}
     }
     
-    
+    Ok(())
 }
 
 fn execute_target(config: &Config, cwd: &Path) {
@@ -122,7 +110,7 @@ fn execute_target(config: &Config, cwd: &Path) {
     else if config.args.release {
         exe_path.push("release");
     }
-    exe_path.join(exe_name);
+    exe_path = exe_path.join(exe_name);
     let mut cmd = std::process::Command::new(exe_path);
 
     if config.args.verbose {

@@ -1,7 +1,6 @@
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::time::{UNIX_EPOCH};
 use crate::config::{Build, Config, Forge, Project};
 use crate::hashes::HashCache;
 
@@ -30,14 +29,6 @@ pub fn find_file(filename: &str) -> Result<PathBuf, FileError> {
     } else {
         Err(FileError::FileNotFound(format!("File not found: {}", filename)))
     }
-}
-
-pub fn get_timestamp(absolut_path: PathBuf) -> Result<u64, String> {
-    let metadata = fs::metadata(absolut_path).map_err(|e| format!("File Error: {}", e))?;
-    let modified_time = metadata.modified().map_err(|e| format!("File Error: {}", e))?;
-    
-    let duration = modified_time.duration_since(UNIX_EPOCH).map_err(|e| format!("File Error: {}", e))?;
-    Ok(duration.as_secs())
 }
 
 pub fn get_equivalent_forge_path(input_path: &Path, config: &Config) -> Result<PathBuf, String> {

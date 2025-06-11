@@ -5,7 +5,10 @@ use crate::arguments::Command::{Rebuild, Run};
 use crate::fs_utils::*;
 use crate::config::{Config};
 use crate::hashes::{cache_hash, get_cached_hash, hash};
-use crate::ui::{print_files_compiled, print_melting, verbose_command, verbose_command_hard};
+use crate::ui::{print_melting, verbose_command, verbose_command_hard};
+use rayon::prelude::*;
+use colored::Colorize;
+
 
 pub fn compile(config: &Config) -> Result<(), String>{
     // get all files to compile
@@ -31,17 +34,16 @@ pub fn compile(config: &Config) -> Result<(), String>{
     };
     
     // compile all files (only gcc for now)
-    let mut files_compiled = 0;
-    for file in files {
-        if files_compiled < 1 {
-            print_melting();
-        }
-        let source_path = find_file(&file).expect(format!("Could not find file: {}", file).as_str());
+    if !files.is_empty() {
+        print_melting();
+    }
+    files.par_iter().enumerate().try_for_each(|(index, file)| -> Result<(), String> {
+        
+        let source_path = find_file(&file).map_err(|_| format!("Could not find file: {}", file))?;
         let output_path = get_equivalent_forge_path(&source_path, &config)?;
         
         let mut cmd = Command::new("gcc");
         
-        // compiler flags based on the build type
         if config.args.debug {
             cmd.arg("-g").arg("-O0").arg("-Wall").arg("-Wextra").arg("-DDEBUG");
         }
@@ -49,17 +51,14 @@ pub fn compile(config: &Config) -> Result<(), String>{
             cmd.arg("-O3").arg("-Wall").arg("-Wextra").arg("-DRELEASE").arg("-DNDEBUG");
         }
         
-        // check for user flags
         if let Some(cflags) = config.forge.build.cflags.clone() {
             for flag in cflags {
                 if is_valid_cflag(&flag) {cmd.arg(flag);}
             }
         }
         
-        // compiler args
         cmd.arg("-c").arg(source_path);
         
-   
         for include_dir in &config.forge.build.include_dirs {
             cmd.arg(format!("-I{}", include_dir));
         }
@@ -68,9 +67,8 @@ pub fn compile(config: &Config) -> Result<(), String>{
                 cmd.arg(format!("-I{}", include_dir));
             }
         }
-        // output flag
-        cmd.arg("-o").arg(output_path);
         
+        cmd.arg("-o").arg(output_path);
         
         if config.args.verbose {
             verbose_command(&cmd);
@@ -78,6 +76,7 @@ pub fn compile(config: &Config) -> Result<(), String>{
         else if config.args.verbose_hard { 
             verbose_command_hard(&cmd);
         }
+        
         let output = cmd.output().expect("Failed to execute gcc");
         
         if !output.status.success() {
@@ -85,11 +84,10 @@ pub fn compile(config: &Config) -> Result<(), String>{
             return Err("Error compiling file".to_string());
         }
         else {
-            files_compiled += 1;
-            print_files_compiled(files_compiled, &file);
+            println!("[{}]: {}", (index + 1).to_string().green(), &file.green())
         }
-    
-    }
+        Ok(())
+    })?;
     Ok(())
 }
 

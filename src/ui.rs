@@ -34,10 +34,6 @@ pub fn print_melting(){
     println!("{}", "Melting...".bold().red())
 }
 
-pub fn print_files_compiled(files_compiled: i32, filename: &str) {
-    println!("[{}]: {}", files_compiled.to_string().green(), filename.green())
-}
-
 pub fn print_smelting(){
     todo!()
 }

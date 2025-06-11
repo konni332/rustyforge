@@ -19,9 +19,11 @@ pub struct ForgeArgs {
     #[arg(long = "verbose-hard", global = true, conflicts_with = "verbose")]
     pub verbose_hard: bool,
     
+    /// specify the build profile as debug (default)
     #[arg(long, global = true, conflicts_with = "release")]
     pub debug: bool,
     
+    /// specify the build profile as release
     #[arg(long, global = true, conflicts_with = "debug")]
     pub release: bool,
     

@@ -48,14 +48,15 @@ pub fn get_equivalent_forge_path(input_path: &Path, config: &Config) -> Result<P
 }
 
 pub fn normalize_path(path: &Path) -> String {
+    let path = path.strip_prefix("./").unwrap_or(path);
     let s = path.to_string_lossy();
     if s.starts_with(r"\\?\") {
-        s[4..].replace("\\","/")
-    }
-    else {
+        s[4..].replace("\\", "/")
+    } else {
         s.replace("\\", "/")
     }
 }
+
 
 pub fn create_forge_dirs(name: &str) -> Result<()> {
     let dir_path = Path::new("forge").join(name);

@@ -12,14 +12,14 @@ A simple, fast build manager for C projects with minimal configuration.
 - Linking `.o` files into the final executable  
 - Cross-platform support (Windows/Linux) with proper handling of paths and executable extensions  
 - Uses `gcc` as the compiler
-
+- Support for linking static and dynamic libraries
+- Hash-based caching, to avoid unnecessary compilation
+- Parallel compilation, for faster builds
 ---
 
 ## Planned Features
 
-- Support for building and linking static and dynamic libraries  
-- Hash-based caching to avoid unnecessary recompilation  
-- Parallel compilation for faster builds  
+- Support for building static and dynamic libraries
 - Test targets and automated test execution  
 - Advanced configuration options (build types, cross-compilation, custom flags)  
 - Logging and debugging options for better traceability  

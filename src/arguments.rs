@@ -38,6 +38,15 @@ pub enum Command {
     Run(RunOptions),
     Rebuild,
     Init,
+    Discover(DiscoverOptions),
+}
+
+#[derive(Args, Debug, PartialEq, Clone)]
+pub struct DiscoverOptions {
+    #[arg(long)]
+    pub auto: bool,
+    #[arg(long, value_name = "PATTERN", num_args = 1)]
+    pub ignore: Vec<String>,
 }
 
 #[derive(Args, Debug, PartialEq, Clone)]

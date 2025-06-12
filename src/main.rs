@@ -4,8 +4,9 @@ use crate::config::{parse_forge_file, Config};
 use crate::fs_utils::{create_forge_dirs, ensure_necessary_files, init_forge_structure, init_hash_cache_json};
 use crate::arguments::ForgeArgs;
 use clap::Parser;
-use crate::arguments::Command::{Build, Run, Rebuild, Clean, Init};
+use crate::arguments::Command::{Build, Run, Rebuild, Clean, Init, Discover};
 use crate::compile::compile;
+use crate::discovery::discover;
 use crate::linker::link;
 use crate::ui::{print_cleaning, verbose_command, verbose_command_hard};
 
@@ -20,9 +21,7 @@ mod hashes;
 mod tests;
 mod ui;
 mod arguments;
-
-
-
+mod discovery;
 
 fn main() {
     // parse command line arguments
@@ -87,12 +86,15 @@ fn main() {
             Clean => {
                 clean(&config, &cwd);
             }
+            Discover(options) => {
+                discover(&options);
+            }
             _ => {
                 print!("Hi! This will never be printed.")
             } // not necessary, just for compiler error suppression
         }
     }
-        // initialize forge structure if init command is used
+    // initialize forge structure if init command is used
     else {
         if let Err(e) = init_forge_structure() {
             eprintln!("Error: {}", e);

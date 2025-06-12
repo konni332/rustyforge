@@ -218,3 +218,4 @@ pub fn init_forge_structure() -> Result<()> {
     fs::create_dir_all("include")?;
     Ok(())  
 }
+

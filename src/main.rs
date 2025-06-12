@@ -92,6 +92,7 @@ fn main() {
             } // not necessary, just for compiler error suppression
         }
     }
+        // initialize forge structure if init command is used
     else {
         if let Err(e) = init_forge_structure() {
             eprintln!("Error: {}", e);

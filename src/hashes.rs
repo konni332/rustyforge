@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use serde::{Deserialize, Serialize};
 use crate::fs_utils::{load_hash_cache_json, normalize_path, save_hash_cache_json};
+use anyhow::Result;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HashCache {
@@ -46,8 +47,12 @@ pub fn get_cached_hash(filepath: &Path) -> Option<String> {
     None
 }
 
-pub fn cache_hash(filepath: &Path, hash: String) {
-    let mut entries = load_hash_cache_json().expect("Failed to load hash cache");
+pub fn cache_hash(filepath: &Path) -> Result<(), String> {
+    let hash = hash(filepath).map_err(|e| e.to_string())?;
+    
+    let mut entries = load_hash_cache_json()
+        .map_err(|e| e.to_string())?;
+    
     let norm_path = normalize_path(filepath);
     
     let mut found = false;
@@ -64,6 +69,15 @@ pub fn cache_hash(filepath: &Path, hash: String) {
             hash,
         });
     }
-    save_hash_cache_json(&entries).expect("Failed to save hash cache");
+    save_hash_cache_json(&entries).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
+pub fn file_changed(filepath: &Path) -> Result<bool> {
+    let new_hash = hash(filepath)?;
+    let cached_hash = get_cached_hash(filepath);
+    if cached_hash.is_none() {
+        return Ok(true);
+    }
+    Ok(cached_hash.unwrap() != new_hash)
+}

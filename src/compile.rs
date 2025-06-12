@@ -1,20 +1,18 @@
 use crate::utils::*;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use crate::arguments::Command::{Rebuild, Run};
 use crate::fs_utils::*;
 use crate::config::{Config};
-use crate::hashes::{cache_hash, get_cached_hash, hash};
+use crate::hashes::{cache_hash, file_changed};
 use crate::ui::{print_melting, verbose_command, verbose_command_hard};
 use rayon::prelude::*;
 use colored::Colorize;
-
+use crate::arguments::Command::{Run, Rebuild};
 
 pub fn compile(config: &Config) -> Result<(), String>{
-    // get all files to compile
-    let files = get_files_to_compile(&config);
-    
-    
+    let to_compile = get_files_to_compile(config)?;
+    let files: Vec<String> = to_compile.iter().map(|(f, _)| f.clone()).collect();
+    let h_files: Vec<PathBuf> = to_compile.iter().flat_map(|(_, h)| h.clone()).collect();
     
     // compile all files (only gcc for now)
     if !files.is_empty() {
@@ -28,10 +26,10 @@ pub fn compile(config: &Config) -> Result<(), String>{
         let mut cmd = Command::new("gcc");
         
         if config.args.debug {
-            cmd.arg("-g").arg("-O0").arg("-Wall").arg("-Wextra").arg("-DDEBUG");
+            add_debug_cflags(&mut cmd);
         }
         else if config.args.release {
-            cmd.arg("-O3").arg("-Wall").arg("-Wextra").arg("-DRELEASE").arg("-DNDEBUG");
+            add_release_cflags(&mut cmd);
         }
         
         if let Some(cflags) = config.forge.build.cflags.clone() {
@@ -69,120 +67,67 @@ pub fn compile(config: &Config) -> Result<(), String>{
         else {
             println!("[{}]", &file.green())
         }
-        let hash = hash(&source_path).unwrap();
-        cache_hash(&source_path, hash);
         Ok(())
     })?;
+    // cache .c hashes
+    for c_file in &config.forge.build.src {
+        cache_hash(Path::new(c_file))?;      
+    }
+    // cache .h hashes
+    for h_file in &h_files {
+        cache_hash(&h_file)?;      
+    }
     Ok(())
 }
 
-
-// TODO: dry run function
-
-fn get_files_to_compile(config: &Config) -> Vec<String> {
-    let mut files = Vec::new();
+pub fn get_files_to_compile(config: &Config) -> Result<Vec<(String, Vec<PathBuf>)>, String> {
+    let mut to_compile= Vec::new();
     
-    // TODO
-    
-    for file in &config.forge.build.src {
-        // get the path to the .c file
-        let file_path = find_file(&file)
-            .expect(format!("Could not find file: {}", file).as_str());
-        
-        // get all .h files that are included in the .c file
-        let rel_path: &Path = Path::new(file);
-        let h_files = parse_h_dependencies(rel_path, &config)
-            .expect("Could not resolve header dependencies");
-        
-        // generate the equivalent forge path for the .c file
-        let o_file = get_equivalent_forge_path(&file_path, &config)
-            .expect(format!("Could not find equivalent forge path for file: {}", file).as_str());
-        
-        let rebuild_all = match &config.args.command { 
-            Rebuild => true,
+    for c_file in &config.forge.build.src {
+        // get all relevant file paths
+        let c_file_path = find_file(&c_file)
+            .map_err(|_| format!("Could not find file: {}", c_file))?;
+        let o_file_path = get_equivalent_forge_path(&c_file_path, &config)?;
+        let h_files = parse_h_dependencies(Path::new(c_file), &config)
+            .map_err(|_| format!("Could not parse header dependencies for file: {}", c_file))?;
+        let mut compile = false;
+        // if command ist rebuild, compile all files
+        match &config.args.command {
+            Rebuild => compile = true,
             Run(options) => {
-                options.clean
+                if options.clean {
+                    compile = true;
+                }
             },
-            _ => false,
-        };
-        
-        
-        
-        let new_c_hash = hash(&file_path); // new .c file hashes are cached after compilation
-        let cached_c_hash = get_cached_hash(&file_path);
-        
-        
-        
-        let mut pushed_c = false;
-        
-        if rebuild_all {
-            files.push(file.clone());
-            pushed_c = true;
-        }
-        
-        if !o_file.exists() && !pushed_c{
-            files.push(file.clone());
-            pushed_c = true;
-        }
-        
-        let cached_c_hash = match cached_c_hash {
-            Some(hash) => hash,
-            None => {
-                if !pushed_c {
-                    files.push(file.clone());
-                    pushed_c = true;
-                }
-                "".to_string() // not going to matter, because we compile it anyway
-            }
-        };
-        
-        match new_c_hash { 
-            Ok(hash)  if hash != cached_c_hash && !pushed_c => {
-                files.push(file.clone());
-                pushed_c = true;
-            }
-            Err(_) => {
-                if !pushed_c {
-                    files.push(file.clone());
-                    pushed_c = true;
-                }
-            }
             _ => {}
         }
         
-        for h_file in h_files {
-            let new_h_hash = hash(&h_file);
-            let cached_h_hash = get_cached_hash(&h_file);
-            match &new_h_hash { 
-                Ok(hash) if!pushed_c => {
-                    match cached_h_hash { 
-                        Some(cached_hash) if hash.as_str() != cached_hash.as_str() => {
-                            files.push(file.clone());
-                            pushed_c = true;
-                        },
-                        None => {
-                            files.push(file.clone());
-                            pushed_c = true;   
-                        }
-                        _ => {}
-                    }
-                }
-                Err(_) => {
-                    if !pushed_c {
-                        files.push(file.clone());
-                        pushed_c = true;   
-                    }
-                }
-                _ => {}
-            }
-            if let Ok(ref hash) = new_h_hash {
-                cache_hash(&h_file, hash.clone());
+        // if the o file doesn't exist, compile
+        if !o_file_path.exists() {
+            compile = true;
+        }
+        // if the c file has changed, compile
+        if file_changed(&c_file_path)
+            .map_err(|_| format!("Could not check if file changed: {}", c_file))? 
+        {
+            compile = true;    
+        }
+        // check if any of the h files have changed
+        for h_file in &h_files {
+            if file_changed(&h_file)
+                .map_err(|_| format!("Could not check if file changed: {}", h_file.display()))? 
+            {
+                compile = true;
+                break;
             }
         }
         
+        // if compile is true, add the c file to the list of files to compile
+        if compile {
+            to_compile.push((c_file.clone(), h_files));
+        }
     }
-
-    files
+    Ok(to_compile)
 }
 
 fn gcc_mm(relpath: &Path, config: &Config) -> Result<String, String> {
@@ -239,7 +184,8 @@ fn parse_h_dependencies(relpath: &Path, config: &Config) -> Result<Vec<PathBuf>,
                 path.to_path_buf()
             }
             else { 
-                cwd.join(path).canonicalize().map_err(|e| format!("Could not canonicalize path: {}", e).to_string())?
+                cwd.join(path).canonicalize()
+                    .map_err(|e| format!("Could not canonicalize path: {}", e).to_string())?
             };
             deps_paths.push(abs_path);
         }

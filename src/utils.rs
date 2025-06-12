@@ -83,3 +83,11 @@ pub fn strip_cwd(arg: &str, cwd: &Path) -> String {
         arg.to_string()
     }
 }
+
+pub fn add_debug_cflags(cmd: &mut Command) {
+    cmd.arg("-g").arg("-O0").arg("-Wall").arg("-Wextra").arg("-DDEBUG");
+}
+
+pub fn add_release_cflags(cmd: &mut Command) {
+    cmd.arg("-O3").arg("-Wall").arg("-Wextra").arg("-DRELEASE").arg("-DNDEBUG");
+}

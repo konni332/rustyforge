@@ -34,6 +34,7 @@ pub fn archive_static_library(cfg: &Config) -> Result<()>{
     // get a formatted name for the library, based on the output name, and the OS(Toolchain)
     let mut name = cfg.forge.build.output.clone();
     format_lib_name(&mut name);
+    name = format!("forge/libs/out/{}", name);
     
     create_forge_sub_dir("libs/out")?;
     

@@ -17,8 +17,7 @@ pub struct Forge {
 #[derive(Deserialize, Debug, Serialize)]
 pub struct Project {
     pub name: String,
-    #[serde(rename = "type")]
-    pub project_type: String,
+    pub targets: Vec<String>,
 }
 
 #[derive(Deserialize, Debug, Serialize)]

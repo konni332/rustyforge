@@ -18,13 +18,14 @@ pub fn compile(config: &Config) -> Result<(), String>{
     if !files.is_empty() {
         print_melting();
     }
-    files.par_iter().enumerate().try_for_each(|(index, file)| -> Result<(), String> {
+    files.par_iter().enumerate().try_for_each(|(_, file)| -> Result<(), String> {
         
         let source_path = find_file(&file).map_err(|_| format!("Could not find file: {}", file))?;
         let output_path = get_equivalent_forge_path(&source_path, &config)?;
         
         let mut cmd = Command::new("gcc");
         
+        // add target specific compiler flags
         if config.args.debug {
             add_debug_cflags(&mut cmd);
         }

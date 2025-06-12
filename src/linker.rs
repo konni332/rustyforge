@@ -1,41 +1,68 @@
-use std::path::PathBuf;
 use std::process::Command;
 use crate::config::{Config};
 #[allow(unused_imports)] // is imported for linux and macOS
 use crate::fs_utils::{find_file, find_r_paths};
-use crate::utils::{is_valid_ldflag};
+use crate::utils::{format_lib_name, is_valid_ldflag};
 use crate::ui::{print_forging, verbose_command, verbose_command_hard};
+use anyhow::{bail, Result};
+use crate::fs_utils::{create_forge_sub_dir, normalize_path, find_o_files};
 
-pub fn find_o_files(config: &Config) -> Vec<PathBuf>{
-    let mut cwd = std::env::current_dir().expect("Failed to get current directory");
-    cwd.push("forge");
-    
-    if config.args.debug {
-        cwd.push("debug");
-    }
-    else {
-        cwd.push("release");
-    }
-    
-    let mut o_files = Vec::new();
-    
-    for entry in std::fs::read_dir(cwd).expect("Failed to read forge/ directory") {
-        let entry = entry.expect("Failed to read entry");
-        let path = entry.path();
-        
-        if path.is_file() {
-            if let Some(ext) = path.extension() {
-                if ext == "o" {
-                    let norm_abs_path = find_file(path.to_str().unwrap()).unwrap();
-                    o_files.push(norm_abs_path);
+
+pub fn link(config: &Config) -> Result<()>{
+    // check all targets
+    for target in &config.forge.project.targets {
+        match target.as_str() {
+            "bin" => {
+                if let Err(e) = link_executable(config){
+                    eprintln!("Error: {}", e);
                 }
             }
+            "static" => {
+                if let Err(e) = archive_static_library(config){
+                    eprintln!("Error: {}", e);
+                }
+            }
+            _ => {
+                bail!("Unknown target: {} None of [bin, static, shared]", target);
+            }
         }
-    }
-    o_files
+    };
+    Ok(())
 }
 
-pub fn link(config: &Config){
+pub fn archive_static_library(cfg: &Config) -> Result<()>{
+    // get a formatted name for the library, based on the output name, and the OS(Toolchain)
+    let mut name = cfg.forge.build.output.clone();
+    format_lib_name(&mut name);
+    
+    create_forge_sub_dir("libs/out")?;
+    
+    let mut cmd = Command::new("ar");
+    cmd.arg("rcs").arg(name);
+    
+    let o_files = find_o_files(&cfg);
+    for o_file in &o_files {
+        // add the normalized path
+        cmd.arg(normalize_path(o_file));
+    }
+    
+    if cfg.args.verbose {
+        verbose_command(&cmd);
+    }
+    else if cfg.args.verbose_hard { 
+        verbose_command_hard(&cmd);
+    }
+    
+    let output = cmd.output().expect("Failed to run ar");
+    
+    if !output.status.success() {
+        bail!("Hammer to rusty, linker failed: {}", String::from_utf8_lossy(&output.stderr))
+    }
+    
+    Ok(())
+}
+
+pub fn link_executable(config: &Config) -> Result<()> {
     let target_executable = if cfg!(target_os = "windows") {
         format!("{}.exe", config.forge.build.output)
     }
@@ -44,7 +71,6 @@ pub fn link(config: &Config){
     };
     
     let o_files = find_o_files(&config);
-    // TODO: Also link libs etc.
     
     print_forging(&target_executable);
     let cwd = std::env::current_dir().expect("Failed to get current directory");
@@ -106,9 +132,10 @@ pub fn link(config: &Config){
     let output = cmd.output().expect("Failed to run gcc");
     
     if !output.status.success() {
-        eprintln!("Hammer to rusty, linker failed: {}", String::from_utf8_lossy(&output.stderr))
+        bail!("Hammer to rusty, linker failed: {}", String::from_utf8_lossy(&output.stderr))
     }
     else { 
         println!("Forging successful!")
     }
+    Ok(())
 }

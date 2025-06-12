@@ -91,3 +91,8 @@ pub fn add_debug_cflags(cmd: &mut Command) {
 pub fn add_release_cflags(cmd: &mut Command) {
     cmd.arg("-O3").arg("-Wall").arg("-Wextra").arg("-DRELEASE").arg("-DNDEBUG");
 }
+
+pub fn format_lib_name(name: &mut String){
+    let new_name = format!("lib{}.a", name);
+    *name = new_name;
+}

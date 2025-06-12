@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::path::Path;
 use crate::config::{parse_forge_file, Config};
-use crate::fs_utils::{create_forge_dirs, ensure_necessary_files, init_forge_structure, init_hash_cache_json};
+use crate::fs_utils::{create_forge_sub_dir, ensure_necessary_files, init_forge_structure, init_hash_cache_json};
 use crate::arguments::ForgeArgs;
 use clap::Parser;
 use crate::arguments::Command::{Build, Run, Rebuild, Clean, Init, Discover};
@@ -56,13 +56,13 @@ fn main() {
         };
         
         if args.debug {
-            if let Err(e) = create_forge_dirs("debug") {
+            if let Err(e) = create_forge_sub_dir("debug") {
                 eprintln!("Error: {}", e);
                 std::process::exit(1);
             }
         }
         else if args.release {
-            if let Err(e) = create_forge_dirs("release") {
+            if let Err(e) = create_forge_sub_dir("release") {
                 eprintln!("Error: {}", e);
                 std::process::exit(1);
             }
@@ -71,23 +71,23 @@ fn main() {
         match &args.command {
             Build => {
                 compile(&config).expect("Error compiling.");
-                link(&config);
+                link(&config).expect("Error linking.");
             }
             Rebuild => {
                 clean(&config, &cwd);
                 compile(&config).expect("Error compiling.");
-                link(&config);
+                link(&config).expect("Error linking.");
             }
             Run(_) => {
                 compile(&config).expect("Error compiling.");
-                link(&config);
+                link(&config).expect("Error linking.");
                 execute_target(&config, &cwd);
             }
             Clean => {
                 clean(&config, &cwd);
             }
             Discover(options) => {
-                discover(&options);
+                discover(&options).expect("Error discovering.");
             }
             _ => {
                 print!("Hi! This will never be printed.")
@@ -159,12 +159,12 @@ fn clean(config: &Config, cwd: &Path) {
     }
     // reinitialize forge directory
     if config.args.debug {
-        if let Err(e) = create_forge_dirs("debug") {
+        if let Err(e) = create_forge_sub_dir("debug") {
             eprintln!("Error: {}", e);
         }
     }
     else if config.args.release {
-        if let Err(e) = create_forge_dirs("release") {
+        if let Err(e) = create_forge_sub_dir("release") {
             eprintln!("Error: {}", e);
         }
     }

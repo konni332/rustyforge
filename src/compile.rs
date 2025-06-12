@@ -71,7 +71,9 @@ pub fn compile(config: &Config) -> Result<(), String>{
     })?;
     // cache .c hashes
     for c_file in &config.forge.build.src {
-        cache_hash(Path::new(c_file))?;      
+        let absolut_path = find_file(&c_file)
+            .map_err(|_| format!("Could not find file: {}", c_file))?;
+        cache_hash(&absolut_path)?;      
     }
     // cache .h hashes
     for h_file in &h_files {

@@ -220,3 +220,29 @@ pub fn init_forge_structure() -> Result<()> {
     Ok(())  
 }
 
+pub enum BuildField {
+    Src,
+    IncludeDirs,
+    Output,
+    Cflags,
+    Ldflags,
+}
+
+pub fn add_to_build_toml(field: BuildField, value: String) -> Result<()> {
+    let path = Path::new("RustyForge.toml");
+    
+    let contents = fs::read_to_string(&path)?;
+    let mut forge = toml::from_str::<Forge>(&contents)?;
+    let vec_ref = match field {
+        BuildField::Src => &mut forge.build.src,
+        BuildField::IncludeDirs => &mut forge.build.include_dirs,
+        _ => {unimplemented!()} // TODO
+    };
+    
+    if !vec_ref.contains(&value) {
+        vec_ref.push(value);
+    }
+    let updated = toml::to_string_pretty(&forge)?;
+    fs::write(&path, updated)?;
+    Ok(()) 
+}

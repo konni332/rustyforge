@@ -4,7 +4,10 @@ use walkdir::WalkDir;
 use std::collections::HashSet;
 use crate::arguments::DiscoverOptions;
 use anyhow::{Result};
-use crate::fs_utils::normalize_path;
+use crate::fs_utils::{add_to_build_toml, normalize_path};
+use crate::fs_utils::BuildField::{IncludeDirs, Src};
+use crate::ui::event_file_found;
+
 
 pub fn discover(options: &DiscoverOptions) -> Result<()> {
     let c_files = find_c_files(".");
@@ -12,22 +15,21 @@ pub fn discover(options: &DiscoverOptions) -> Result<()> {
     
     for c_file in c_files {
         let str = normalize_path(&c_file);
-        if !should_be_ignored(&str, options.ignore.as_slice()) {
-            println!("{}", str);
+        if event_file_found(options, &str) {
+            add_to_build_toml(Src, str.clone())?;
         }
-        
     }
     for header_dir in header_dirs {
         let str = normalize_path(&header_dir);
-        if !should_be_ignored(&str, options.ignore.as_slice()) {
-            println!("{}", str);
+        if event_file_found(options, &str) {
+            add_to_build_toml(IncludeDirs, str.clone())?;
         }
     };
     Ok(())
 }
 
 /// checks if a file should be ignored by the discovery process
-fn should_be_ignored(name: &String, ignore: &[String] ) -> bool {
+pub fn should_be_ignored(name: &String, ignore: &[String] ) -> bool {
     let mut builder = GlobSetBuilder::new();
     
     for pattern in ignore {

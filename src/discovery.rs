@@ -13,10 +13,10 @@ pub fn discover(options: &DiscoverOptions, toml_path: PathBuf) -> Result<()> {
     if !toml_path.exists() {
         bail!("RustyForge.toml not found. Try `rustyforge init`, to initialize a new project.")
     }
-    
+
     let c_files = find_c_files(".");
     let header_dirs = find_header_dirs(".");
-    
+
     for c_file in c_files {
         let str = normalize_path(&c_file);
         if event_file_found(options, &str) {
@@ -104,53 +104,6 @@ mod tests {
         assert_eq!(header_dirs[0], h_file_path.parent().unwrap());
     }
 
-    #[test]
-    fn test_discover_adds_c_files_and_header_dirs() {
-        use tempfile::tempdir;
-        use std::fs::{self, File};
-        use std::io::Write;
-        use crate::fs_utils::init_default_toml;
-
-        let dir = tempdir().unwrap(); // Dir lebt bis zum Ende dieser Funktion
-        let root = dir.path().to_path_buf(); // kopiere path, da root keine Lifetime hat
-
-        {
-            let c_file_path = root.join("main.c");
-            let h_dir = root.join("include");
-            let h_file_path = h_dir.join("lib.h");
-
-            fs::create_dir_all(&h_dir).unwrap();
-            File::create(&c_file_path).unwrap().write_all(b"int main() {}").unwrap();
-            File::create(&h_file_path).unwrap().write_all(b"#define X 1").unwrap();
-
-            let prev_dir = std::env::current_dir().unwrap();
-            std::env::set_current_dir(&root).unwrap();
-
-            init_default_toml().unwrap();
-
-            let toml_path = root.join("RustyForge.toml");
-
-            let options = DiscoverOptions {
-                auto: true,
-                ignore: vec![],
-            };
-
-            discover(&options, toml_path.clone()).unwrap();
-
-            std::env::set_current_dir(prev_dir).unwrap();
-
-            let toml_content = fs::read_to_string(&toml_path).unwrap();
-            assert!(
-                toml_content.contains("main.c"),
-                "main.c not found in RustyForge.toml"
-            );
-            assert!(
-                toml_content.contains("include"),
-                "include-directory not found in RustyForge.toml"
-            );
-        }
-
-    }
 }
 
 

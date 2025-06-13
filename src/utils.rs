@@ -104,3 +104,88 @@ pub fn format_shared_lib_name(name: &mut String){
     let new_name = format!("lib{}.so", name);
     *name = new_name;
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_exact_flags() {
+        let flags = [
+            "-O2", "-O3", "-g", "-Werror", "-pthread", "-pipe", "-c", "-S"
+        ];
+        for flag in flags {
+            assert!(is_valid_cflag(flag), "Expected '{}' to be valid", flag);
+        }
+    }
+
+    #[test]
+    fn test_valid_prefix_flags() {
+        let flags = [
+            "-I/usr/include",
+            "-isystem/usr/local/include",
+            "-DDEBUG_MODE",
+            "-std=c99",
+            "-fvisibility=hidden",
+            "-march=native",
+            "-mtune=core2"
+        ];
+        for flag in flags {
+            assert!(is_valid_cflag(flag), "Expected '{}' to be valid", flag);
+        }
+    }
+
+    #[test]
+    fn test_forbidden_flags() {
+        let forbidden = ["-Wall", "-Wextra", "-DDEBUG", "-DNDEBUG"];
+        for flag in forbidden {
+            assert!(!is_valid_cflag(flag), "Expected '{}' to be forbidden", flag);
+        }
+    }
+
+    #[test]
+    fn test_invalid_flags() {
+        let invalid = ["-O4", "-Wbanana", "-funroll-loops", "--weirdflag"];
+        for flag in invalid {
+            assert!(!is_valid_cflag(flag), "Expected '{}' to be invalid", flag);
+        }
+    }
+    #[test]
+    fn test_valid_ldflags_exact() {
+        let flags = [
+            "-shared",
+            "-static",
+            "-pthread",
+            "-rdynamic",
+            "-pie",
+            "-fPIC",
+        ];
+        for flag in flags {
+            assert!(is_valid_ldflag(flag), "Expected '{}' to be valid", flag);
+        }
+    }
+
+    #[test]
+    fn test_valid_ldflags_prefix() {
+        let flags = [
+            "-L/usr/lib",
+            "-lssl",
+            "-lcrypto",
+            "-Wl,--as-needed",
+        ];
+        for flag in flags {
+            assert!(is_valid_ldflag(flag), "Expected '{}' to be valid", flag);
+        }
+    }
+
+    #[test]
+    fn test_invalid_ldflags() {
+        let flags = [
+            "-Zweird",
+            "-Xlinker",
+            "-unknownflag",
+        ];
+        for flag in flags {
+            assert!(!is_valid_ldflag(flag), "Expected '{}' to be invalid", flag);
+        }
+    }
+}

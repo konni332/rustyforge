@@ -3,26 +3,30 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use std::collections::HashSet;
 use crate::arguments::DiscoverOptions;
-use anyhow::{Result};
+use anyhow::{bail, Result};
 use crate::fs_utils::{add_to_build_toml, normalize_path};
 use crate::fs_utils::BuildField::{IncludeDirs, Src};
 use crate::ui::event_file_found;
 
 
-pub fn discover(options: &DiscoverOptions) -> Result<()> {
+pub fn discover(options: &DiscoverOptions, toml_path: PathBuf) -> Result<()> {
+    if !toml_path.exists() {
+        bail!("RustyForge.toml not found. Try `rustyforge init`, to initialize a new project.")
+    }
+    
     let c_files = find_c_files(".");
     let header_dirs = find_header_dirs(".");
     
     for c_file in c_files {
         let str = normalize_path(&c_file);
         if event_file_found(options, &str) {
-            add_to_build_toml(Src, str.clone())?;
+            add_to_build_toml(&toml_path, Src, str.clone())?;
         }
     }
     for header_dir in header_dirs {
         let str = normalize_path(&header_dir);
         if event_file_found(options, &str) {
-            add_to_build_toml(IncludeDirs, str.clone())?;
+            add_to_build_toml(&toml_path, IncludeDirs, str.clone())?;
         }
     };
     Ok(())
@@ -71,3 +75,94 @@ pub fn find_header_dirs(root: &str) -> Vec<PathBuf> {
 
     dirs.into_iter().collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+    use super::*;
+    
+    #[test]
+    fn test_should_be_ignored(){
+        let patterns = vec!["*.c".to_string(), "ignored/**".to_string()];
+        assert!(should_be_ignored(&"main.c".to_string(), &patterns));
+        assert!(should_be_ignored(&"ignored/file.h".to_string(), &patterns));
+        assert!(!should_be_ignored(&"src/lib.h".to_string(), &patterns));
+    }
+    #[test]
+    fn test_find_c_files_and_header_dirs() {
+        let dir = tempdir().unwrap();
+        let c_file_path = dir.path().join("main.c");
+        let h_file_path = dir.path().join("main.h");
+        std::fs::write(&c_file_path, "int main() {}").unwrap();
+        std::fs::write(&h_file_path, "// header").unwrap();
+        
+        let c_files = find_c_files(dir.path().to_str().unwrap());
+        assert_eq!(c_files.len(), 1);
+        assert_eq!(c_files[0], c_file_path);
+        let header_dirs = find_header_dirs(dir.path().to_str().unwrap());
+        assert_eq!(header_dirs.len(), 1);
+        assert_eq!(header_dirs[0], h_file_path.parent().unwrap());
+    }
+
+    #[test]
+    fn test_discover_adds_c_files_and_header_dirs() {
+        use tempfile::tempdir;
+        use std::fs::{self, File};
+        use std::io::Write;
+        use crate::fs_utils::init_default_toml;
+
+        let dir = tempdir().unwrap(); // Dir lebt bis zum Ende dieser Funktion
+        let root = dir.path().to_path_buf(); // kopiere path, da root keine Lifetime hat
+
+        {
+            let c_file_path = root.join("main.c");
+            let h_dir = root.join("include");
+            let h_file_path = h_dir.join("lib.h");
+
+            fs::create_dir_all(&h_dir).unwrap();
+            File::create(&c_file_path).unwrap().write_all(b"int main() {}").unwrap();
+            File::create(&h_file_path).unwrap().write_all(b"#define X 1").unwrap();
+
+            let prev_dir = std::env::current_dir().unwrap();
+            std::env::set_current_dir(&root).unwrap();
+
+            init_default_toml().unwrap();
+
+            let toml_path = root.join("RustyForge.toml");
+
+            let options = DiscoverOptions {
+                auto: true,
+                ignore: vec![],
+            };
+
+            discover(&options, toml_path.clone()).unwrap();
+
+            std::env::set_current_dir(prev_dir).unwrap();
+
+            let toml_content = fs::read_to_string(&toml_path).unwrap();
+            assert!(
+                toml_content.contains("main.c"),
+                "main.c not found in RustyForge.toml"
+            );
+            assert!(
+                toml_content.contains("include"),
+                "include-directory not found in RustyForge.toml"
+            );
+        }
+
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

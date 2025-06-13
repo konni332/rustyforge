@@ -161,8 +161,8 @@ pub fn init_default_toml() -> Result<()> {
             targets: vec!["bin".to_string()],
         },
         build: Build {
-            src: vec!["src/main.c".into()],
-            include_dirs: vec!["include".into()],
+            src: vec![],
+            include_dirs: vec![],
             output: dir_name.to_string(),
             cflags: None,
             ldflags: None,

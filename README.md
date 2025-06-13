@@ -6,35 +6,31 @@ A simple, fast build manager for C projects with minimal configuration.
 
 ## Current Features
 
-- Parsing `rustyforge.toml` configuration file  
-- Automatically determining `.c` files to compile based on timestamps and header dependencies  
+- Parsing the `RustyForge.toml` configuration file  
 - Compiling individual `.c` files to `.o` files with correct include paths  
 - Linking `.o` files into the final executable  
 - Cross-platform support (Windows/Linux) with proper handling of paths and executable extensions  
 - Uses `gcc` as the compiler
-- Support for linking static and dynamic libraries
-- Hash-based caching, to avoid unnecessary compilation
+- Hash-based caching, to avoid unnecessary compilation (including `.h` files)
 - Parallel compilation, for faster builds
+- Support for linking static and dynamic libraries
+- Support for building static and dynamic libraries
 ---
 
 ## Planned Features
 
-- Support for building static and dynamic libraries
-- Test targets and automated test execution  
-- Advanced configuration options (build types, cross-compilation, custom flags)  
-- Logging and debugging options for better traceability  
-- CLion plugin for automatic management of `rustyforge.toml` and seamless IDE workflow  
-- Syntax highlighting and autocomplete for `rustyforge.toml` in IDEs
+- Test targets and automated test execution 
+- Cross compilation
+- Support for more compilers (`clang` `tcc`)
 
 ---
 
 ## CLion Plugin (Planned)
 
-- Goal: Automatically detect and add new source files to build configuration  
+- Automatically detect and add new source files to the build configuration  
 - Show build errors directly in the IDE  
-- Facilitate easy maintenance of `rustyforge.toml`  
-- Implementation language: Kotlin (recommended for JetBrains plugins)  
-- Effort: Medium – basic version realistic within a few weeks
+- Facilitate easy maintenance of `RustyForge.toml`  
+- Syntax highlighting and autocomplete for `RustyForge.toml`
 
 ---
 
@@ -49,24 +45,35 @@ A simple, fast build manager for C projects with minimal configuration.
 
 ## Usage
 
-- Create a project with a `rustyforge.toml` file  
-- Run `rustyforge build` to compile and link the project  
-- Additional commands planned: `rustyforge clean`, `rustyforge test`
+- Create a project with a `RustyForge.toml` file  
+- Run `rustyforge --help` to see usage
+
+### Examples `Shell`
+````shell
+rustyforge init
+rustyforge discover
+rustyforge build --verbose
+````
 
 ---
 
-## Example `rustyforge.toml`
+## Example `RustyForge.toml`
 
 ```toml
-[build]
-src = ["src/main.c", "src/utils.c"]
-include_dirs = ["include/"]
-target_exe = "my_project"
-link = ["src/runner.c"]
+[project]
+name = "project-name"
+targets = ["bin", "shared", "static"]
 
-[libs]
-static = ["libfoo.a"]
-dynamic = ["libbar.so"]
+[build]
+src = ["src/main.c", "src/foo.c"]
+include_dirs = ["include"]
+output = "lib_or_executable_name"
+
+[dependencies]
+libraries = ["bar"]
+library_paths = ["libs"]
+include_dirs = ["libs/include"]
+posix_libraries = ["m", "pthreads"]
 ```
 
 ---

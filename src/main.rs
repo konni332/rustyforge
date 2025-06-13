@@ -55,6 +55,16 @@ fn main() {
             args: args.clone(),
         };
         
+        let targets = &config.forge.project.targets;
+        if targets.iter().any(|t| t == "static" || t == "shared") {
+            for dir in ["libs/out", "libs/obj"] {
+                if let Err(e) = create_forge_sub_dir(dir) {
+                    eprintln!("Error creating {}: {}", dir, e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        
         if args.debug {
             if let Err(e) = create_forge_sub_dir("debug") {
                 eprintln!("Error: {}", e);
@@ -150,6 +160,10 @@ fn clean(config: &Config, cwd: &Path) {
         let path = cwd.join("forge").join("release");
         std::fs::remove_dir_all(path).expect("Error removing release directory.");
     }
+    
+    let libs_path = cwd.join("forge").join("libs");
+    std::fs::remove_dir_all(libs_path).expect("Error removing libs directory.");
+    
     let json_path = cwd.join("forge").join(".forge").join("hash_cache.json");
     std::fs::remove_file(json_path).expect("Error removing hash cache file.");
     // reinitialize empty hash_cache.json file

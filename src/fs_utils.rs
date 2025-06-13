@@ -32,13 +32,16 @@ pub fn find_file(filename: &str) -> Result<PathBuf, FileError> {
     }
 }
 
-pub fn get_equivalent_forge_path(input_path: &Path, config: &Config) -> Result<PathBuf, String> {
+pub fn get_equivalent_forge_path(input_path: &Path, config: &Config, shared: bool) -> Result<PathBuf, String> {
     let cwd = std::env::current_dir().map_err(|e| format!("CWD Error: {}", e))?;
     let file_stem = input_path.file_stem().and_then(|s| s.to_str())
         .ok_or("File stem not valid UTF-8")?;
     
     let forge_path: PathBuf;
-    if config.args.debug {
+    if shared { 
+        forge_path = cwd.join("forge").join("libs").join("obj").join(format!("{}.o", file_stem));
+    }
+    else if config.args.debug {
         forge_path = cwd.join("forge").join("debug").join(format!("{}.o", file_stem));
     }
     else {
@@ -243,16 +246,9 @@ pub fn add_to_build_toml(field: BuildField, value: String) -> Result<()> {
     Ok(()) 
 }
 
-pub fn find_o_files(config: &Config) -> Vec<PathBuf>{
-    let mut cwd = std::env::current_dir().expect("Failed to get current directory");
-    cwd.push("forge");
-
-    if config.args.debug {
-        cwd.push("debug");
-    }
-    else {
-        cwd.push("release");
-    }
+pub fn find_o_files(rel_path: &Path) -> Vec<PathBuf>{
+    let cwd = std::env::current_dir().expect("Failed to get current directory");
+    let cwd = cwd.join(rel_path);
 
     let mut o_files = Vec::new();
 

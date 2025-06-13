@@ -9,19 +9,34 @@ use rayon::prelude::*;
 use colored::Colorize;
 use crate::arguments::Command::{Run, Rebuild};
 
+
 pub fn compile(config: &Config) -> Result<(), String>{
-    let to_compile = get_files_to_compile(config)?;
+    let targets = &config.forge.project.targets;
+    if targets.contains(&"shared".to_string()) {
+        compile_either(config, true)?;
+    }
+    if targets.contains(&"static".to_string()) || targets.contains(&"bin".to_string()) {
+        compile_either(config, false)?;   
+    }
+    Ok(())
+}
+
+pub fn compile_either(config: &Config, shared: bool) -> Result<(), String>{
+    let to_compile = get_files_to_compile(config, shared)?;
     let files: Vec<String> = to_compile.iter().map(|(f, _)| f.clone()).collect();
     let h_files: Vec<PathBuf> = to_compile.iter().flat_map(|(_, h)| h.clone()).collect();
+    
+    if shared {
+        create_forge_sub_dir("libs/obj").map_err(|e| format!("Could not create forge sub dir: {}", e))?;
+    }
     
     // compile all files (only gcc for now)
     if !files.is_empty() {
         print_melting();
     }
     files.par_iter().enumerate().try_for_each(|(_, file)| -> Result<(), String> {
-        
         let source_path = find_file(&file).map_err(|_| format!("Could not find file: {}", file))?;
-        let output_path = get_equivalent_forge_path(&source_path, &config)?;
+        let output_path = get_equivalent_forge_path(&source_path, &config, shared)?;
         
         let mut cmd = Command::new("gcc");
         
@@ -31,6 +46,10 @@ pub fn compile(config: &Config) -> Result<(), String>{
         }
         else if config.args.release {
             add_release_cflags(&mut cmd);
+        }
+        // if we are compiling a shared library, add the extra flags
+        if shared {
+            cmd.arg("-fPIC");
         }
         
         if let Some(cflags) = config.forge.build.cflags.clone() {
@@ -83,14 +102,14 @@ pub fn compile(config: &Config) -> Result<(), String>{
     Ok(())
 }
 
-pub fn get_files_to_compile(config: &Config) -> Result<Vec<(String, Vec<PathBuf>)>, String> {
+pub fn get_files_to_compile(config: &Config, shared: bool) -> Result<Vec<(String, Vec<PathBuf>)>, String> {
     let mut to_compile= Vec::new();
     
     for c_file in &config.forge.build.src {
         // get all relevant file paths
         let c_file_path = find_file(&c_file)
             .map_err(|_| format!("Could not find file: {}", c_file))?;
-        let o_file_path = get_equivalent_forge_path(&c_file_path, &config)?;
+        let o_file_path = get_equivalent_forge_path(&c_file_path, &config, shared)?;
         let h_files = parse_h_dependencies(Path::new(c_file), &config)
             .map_err(|_| format!("Could not parse header dependencies for file: {}", c_file))?;
         let mut compile = false;

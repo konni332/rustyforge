@@ -96,3 +96,11 @@ pub fn format_lib_name(name: &mut String){
     let new_name = format!("lib{}.a", name);
     *name = new_name;
 }
+
+pub fn format_shared_lib_name(name: &mut String){
+    #[cfg(target_os = "windows")]
+    let new_name = format!("lib{}.dll", name);
+    #[cfg(target_os = "linux")]
+    let new_name = format!("lib{}.so", name);
+    *name = new_name;
+}

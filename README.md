@@ -1,20 +1,23 @@
 # rustyforge
 
-A simple, fast build manager for C projects with minimal configuration.
+RustyForge is a minimal, fast, and cross-platform build system for C.
+It’s designed for simplicity and ease of use, with modern features like toml-based configuration, parallel builds,
+and hash-based caching.
+Ideal for both beginners and experienced developers looking for a streamlined alternative to Make.
+
 
 ---
 
 ## Current Features
 
 - Parsing the `RustyForge.toml` configuration file  
-- Compiling individual `.c` files to `.o` files with correct include paths  
-- Linking `.o` files into the final executable  
-- Cross-platform support (Windows/Linux) with proper handling of paths and executable extensions  
-- Uses `gcc` as the compiler
 - Hash-based caching, to avoid unnecessary compilation (including `.h` files)
+- Compiling individual `.c` files to `.o` files with correct include paths  
 - Parallel compilation, for faster builds
-- Support for linking static and dynamic libraries
-- Support for building static and dynamic libraries
+- Linking `.o` files into the final executable  
+- Support for linking and building static (`.a`) and dynamic (`.so`/`.dll`) libraries
+- Cross-platform support (Windows/Linux) with proper handling of paths and executable extensions
+- Uses `gcc` as the compiler
 ---
 
 ## Planned Features
@@ -22,6 +25,7 @@ A simple, fast build manager for C projects with minimal configuration.
 - Test targets and automated test execution 
 - Cross compilation
 - Support for more compilers (`clang` `tcc`)
+- Support for non gcc-based toolchains
 
 ---
 
@@ -48,11 +52,12 @@ A simple, fast build manager for C projects with minimal configuration.
 - Create a project with a `RustyForge.toml` file  
 - Run `rustyforge --help` to see usage
 
-### Examples `Shell`
+### Examples `Commands`
 ````shell
 rustyforge init
 rustyforge discover
 rustyforge build --verbose
+rustyforge clean
 ````
 
 ---
@@ -80,7 +85,7 @@ posix_libraries = ["m", "pthreads"]
 
 ## Contact / Contributing
 
-Feel free to open issues or pull requests for questions, ideas, or contributions.
+Open issues or pull requests for questions, ideas, or contributions
 
 ---
 

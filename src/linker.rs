@@ -209,3 +209,4 @@ pub fn link_executable(config: &Config) -> Result<()> {
     }
     Ok(())
 }
+

@@ -1,0 +1,14 @@
+[
+  {
+    "path": "C:/Users/doepp/CLionProjects/rustyforge/tests/fixtures/valid_project/main.c",
+    "hash": "19b244d72a4c42443fccbfa733a0a55617da3eaa93e0971955f7104d4bf5b962"
+  },
+  {
+    "path": "C:/Users/doepp/CLionProjects/rustyforge/tests/fixtures/valid_project/lib.c",
+    "hash": "92f3b38f6a18290bb9c468cc309b89eabfa61da1f1856f327e48afeafeb932cd"
+  },
+  {
+    "path": "C:/Users/doepp/CLionProjects/rustyforge/tests/fixtures/valid_project/include/lib.h",
+    "hash": "d2499077ab0508f5817fce783f60b6a9e36128999d882cd09e88755aa22d2b76"
+  }
+]

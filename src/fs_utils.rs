@@ -102,6 +102,11 @@ pub fn find_r_paths(config: &Config) -> Vec<PathBuf> {
     paths
 }
 
+pub fn std_toml_path() -> Result<PathBuf> {
+    Ok(std::env::current_dir()?
+        .join("RustyForge.toml"))
+}
+
 pub fn std_hash_cache_path() -> Result<PathBuf> {
     Ok(std::env::current_dir()?
         .join("forge")
@@ -220,10 +225,9 @@ pub enum BuildField {
     IncludeDirs,
 }
 
-pub fn add_to_build_toml(field: BuildField, value: String) -> Result<()> {
-    let path = Path::new("RustyForge.toml");
+pub fn add_to_build_toml(toml_path: &Path, field: BuildField, value: String) -> Result<()> {
     
-    let contents = fs::read_to_string(&path)?;
+    let contents = fs::read_to_string(&toml_path)?;
     let mut forge = toml::from_str::<Forge>(&contents)?;
     let vec_ref = match field {
         BuildField::Src => &mut forge.build.src,
@@ -234,7 +238,7 @@ pub fn add_to_build_toml(field: BuildField, value: String) -> Result<()> {
         vec_ref.push(value);
     }
     let updated = toml::to_string_pretty(&forge)?;
-    fs::write(&path, updated)?;
+    fs::write(&toml_path, updated)?;
     Ok(()) 
 }
 

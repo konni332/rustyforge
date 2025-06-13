@@ -24,10 +24,12 @@ pub fn compile(config: &Config) -> Result<(), String>{
 pub fn compile_either(config: &Config, shared: bool) -> Result<(), String>{
     let to_compile = get_files_to_compile(config, shared)?;
     let files: Vec<String> = to_compile.iter().map(|(f, _)| f.clone()).collect();
-    let h_files: Vec<PathBuf> = to_compile.iter().flat_map(|(_, h)| h.clone()).collect();
+    let h_files: Vec<PathBuf> = to_compile.iter()
+        .flat_map(|(_, h)| h.clone()).collect();
     
     if shared {
-        create_forge_sub_dir("libs/obj").map_err(|e| format!("Could not create forge sub dir: {}", e))?;
+        create_forge_sub_dir("libs/obj")
+            .map_err(|e| format!("Could not create forge sub dir: {}", e))?;
     }
     
     // compile all files (only gcc for now)
@@ -35,7 +37,8 @@ pub fn compile_either(config: &Config, shared: bool) -> Result<(), String>{
         print_melting();
     }
     files.par_iter().enumerate().try_for_each(|(_, file)| -> Result<(), String> {
-        let source_path = find_file(&file).map_err(|_| format!("Could not find file: {}", file))?;
+        let source_path = find_file(&file)
+            .map_err(|_| format!("Could not find file: {}", file))?;
         let output_path = get_equivalent_forge_path(&source_path, &config, shared)?;
         
         let mut cmd = Command::new("gcc");
@@ -81,7 +84,10 @@ pub fn compile_either(config: &Config, shared: bool) -> Result<(), String>{
         let output = cmd.output().expect("Failed to execute gcc");
         
         if !output.status.success() {
-            eprintln!("Furnace not hot enough! Error compiling file: {}:\n{}", file, String::from_utf8_lossy(&output.stderr));
+            eprintln!(
+                "Furnace not hot enough! Error compiling file: {}:\n{}",
+                file, String::from_utf8_lossy(&output.stderr)
+            );
             return Err("Error compiling file".to_string());
         }
         else {
@@ -93,16 +99,20 @@ pub fn compile_either(config: &Config, shared: bool) -> Result<(), String>{
     for c_file in &config.forge.build.src {
         let absolut_path = find_file(&c_file)
             .map_err(|_| format!("Could not find file: {}", c_file))?;
-        cache_hash(&absolut_path)?;      
+        cache_hash(&absolut_path, std_hash_cache_path()
+            .expect("Could not get std hash cache path"))?;      
     }
     // cache .h hashes
     for h_file in &h_files {
-        cache_hash(&h_file)?;      
+        cache_hash(&h_file, std_hash_cache_path()
+            .expect("Could not get std hash cache path"))?;      
     }
     Ok(())
 }
 
-pub fn get_files_to_compile(config: &Config, shared: bool) -> Result<Vec<(String, Vec<PathBuf>)>, String> {
+pub fn get_files_to_compile(config: &Config, shared: bool)
+    -> Result<Vec<(String, Vec<PathBuf>)>, String> 
+{
     let mut to_compile= Vec::new();
     
     for c_file in &config.forge.build.src {
@@ -129,14 +139,16 @@ pub fn get_files_to_compile(config: &Config, shared: bool) -> Result<Vec<(String
             compile = true;
         }
         // if the c file has changed, compile
-        if file_changed(&c_file_path)
+        if file_changed(&c_file_path, std_hash_cache_path()
+                .expect("Could not get std hash cache path"))
             .map_err(|_| format!("Could not check if file changed: {}", c_file))? 
         {
             compile = true;    
         }
         // check if any of the h files have changed
         for h_file in &h_files {
-            if file_changed(&h_file)
+            if file_changed(&h_file, std_hash_cache_path()
+                    .expect("Could not get std hash cache path"))
                 .map_err(|_| format!("Could not check if file changed: {}", h_file.display()))? 
             {
                 compile = true;
@@ -169,16 +181,21 @@ fn gcc_mm(relpath: &Path, config: &Config) -> Result<String, String> {
         verbose_command_hard(&cmd);  
     }
     
-    let output = cmd.output().map_err(|e| format!("Command Error: {}", e).to_string())?;
+    let output = cmd.output()
+        .map_err(|e| format!("Command Error: {}", e).to_string())?;
     
     if output.status.success() {
         let stdout = String::from_utf8(output.stdout)
-            .map_err(|e| format!("Could not convert stdout to string: {}", e).to_string())?;
+            .map_err(
+                |e| format!("Could not convert stdout to string: {}", e).to_string()
+            )?;
         Ok(stdout)
     }
     else {
         let stderr = String::from_utf8(output.stderr)
-            .map_err(|e| format!("Could not convert stderr to string: {}", e).to_string())?;
+            .map_err(
+                |e| format!("Could not convert stderr to string: {}", e).to_string()
+            )?;
         Err(format!("gcc Error: {}", stderr).to_string())
     }
 }
@@ -195,7 +212,8 @@ fn parse_h_dependencies(relpath: &Path, config: &Config) -> Result<Vec<PathBuf>,
     let deps_str = deps_str.replace("\\\n", "");
     let deps = deps_str.split_whitespace();
     
-    let cwd = std::env::current_dir().expect("Could not get current working directory");
+    let cwd = std::env::current_dir()
+        .expect("Could not get current working directory");
     
     let mut deps_paths = Vec::new();
     
@@ -212,6 +230,7 @@ fn parse_h_dependencies(relpath: &Path, config: &Config) -> Result<Vec<PathBuf>,
             deps_paths.push(abs_path);
         }
     }
+    
     Ok(deps_paths)
 }
 

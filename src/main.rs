@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::path::Path;
 use crate::config::{parse_forge_file, Config};
-use crate::fs_utils::{create_forge_sub_dir, ensure_necessary_files, init_forge_structure, init_hash_cache_json};
+use crate::fs_utils::{create_forge_sub_dir, ensure_necessary_files, init_forge_structure, init_hash_cache_json, std_hash_cache_path, std_toml_path};
 use crate::arguments::ForgeArgs;
 use clap::Parser;
 use crate::arguments::Command::{Build, Run, Rebuild, Clean, Init, Discover};
@@ -12,7 +12,6 @@ use crate::ui::{print_cleaning, verbose_command, verbose_command_hard};
 
 
 mod config;
-mod runner;
 mod fs_utils;
 mod compile;
 mod linker;
@@ -97,7 +96,9 @@ fn main() {
                 clean(&config, &cwd);
             }
             Discover(options) => {
-                discover(&options).expect("Error discovering.");
+                discover(&options, std_toml_path()
+                    .expect("Error generating standard .toml path")
+                ).expect("Error discovering.");
             }
             _ => {
                 print!("Hi! This will never be printed.")
@@ -167,7 +168,7 @@ fn clean(config: &Config, cwd: &Path) {
     let json_path = cwd.join("forge").join(".forge").join("hash_cache.json");
     std::fs::remove_file(json_path).expect("Error removing hash cache file.");
     // reinitialize empty hash_cache.json file
-    if let Err(e) = init_hash_cache_json(){
+    if let Err(e) = init_hash_cache_json(std_hash_cache_path().expect("Error getting hash cache path.")){
         eprintln!("Error: {}", e);
         std::process::exit(1);
     }

@@ -102,12 +102,14 @@ pub fn find_r_paths(config: &Config) -> Vec<PathBuf> {
     paths
 }
 
-pub fn init_hash_cache_json() -> Result<()> {
-    let json_path: PathBuf = std::env::current_dir()?
+pub fn std_hash_cache_path() -> Result<PathBuf> {
+    Ok(std::env::current_dir()?
         .join("forge")
         .join(".forge")
-        .join("hash_cache.json");
+        .join("hash_cache.json"))
+}
 
+pub fn init_hash_cache_json(json_path: PathBuf) -> Result<()> {
     if !json_path.exists() {
         if let Some(parent) = json_path.parent() {
             fs::create_dir_all(parent)?;
@@ -119,12 +121,7 @@ pub fn init_hash_cache_json() -> Result<()> {
 }
 
 
-pub fn load_hash_cache_json() -> Result<Vec<HashCache>, Box<dyn std::error::Error>> {
-    let json_path = std::env::current_dir()?
-        .join("forge")
-        .join(".forge")
-        .join("hash_cache.json");
-    
+pub fn load_hash_cache_json(json_path: PathBuf) -> Result<Vec<HashCache>, Box<dyn std::error::Error>> {
     let data = if Path::new(&json_path).exists() {
         fs::read_to_string(json_path)?
     }
@@ -137,12 +134,7 @@ pub fn load_hash_cache_json() -> Result<Vec<HashCache>, Box<dyn std::error::Erro
     Ok(entries)  
 }
 
-pub fn save_hash_cache_json(entries: &Vec<HashCache>) -> Result<(), Box<dyn std::error::Error>> {
-    let json_path = std::env::current_dir()?
-        .join("forge")
-        .join(".forge")
-        .join("hash_cache.json");
-    
+pub fn save_hash_cache_json(entries: &Vec<HashCache>, json_path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let data = serde_json::to_string_pretty(entries)?;
     fs::write(json_path, data)?;
     Ok(())
@@ -215,7 +207,7 @@ pub fn init_forge_structure() -> Result<()> {
     // create forge files
     create_forge_dir()?;
     create_forge_sub_dir(".forge")?;
-    init_hash_cache_json()?;
+    init_hash_cache_json(std_hash_cache_path()?)?;
     init_default_toml()?;
     // create the default project structure
     fs::create_dir_all("src")?;
@@ -266,4 +258,142 @@ pub fn find_o_files(rel_path: &Path) -> Vec<PathBuf>{
         }
     }
     o_files
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::{File};
+    use std::io::Write;
+    use tempfile::tempdir;
+    use std::path::Path;
+    use std::path::PathBuf;
+    use crate::tests::dummy_config;
+    #[test]
+    fn test_find_file_exists() {
+        let dir = tempdir().expect("Failed to create temp dir");
+        let file_path = dir.path().join("test.txt");
+        
+        let mut file = File::create(&file_path).expect("Failed to create file");
+        writeln!(file, "Hello, world!").expect("Failed to write to file");
+        
+        let orig_cwd = std::env::current_dir().expect("Failed to get current directory");
+        std::env::set_current_dir(dir.path()).expect("Failed to set current directory");
+        
+        let result = find_file("test.txt");
+        assert!(result.is_ok());
+        let found_path = result.unwrap();
+        assert_eq!(found_path, file_path);
+        
+        std::env::set_current_dir(orig_cwd).expect("Failed to reset current directory");
+    }
+    #[test]
+    fn test_find_file_not_exists() {
+         let orig_cwd = std::env::current_dir().unwrap();
+
+        let result = find_file("file_that_does_not_exist.txt");
+        assert!(result.is_err());
+        if let Err(FileError::FileNotFound(msg)) = result {
+            assert!(msg.contains("file_that_does_not_exist.txt"));
+        } else {
+            panic!("Expected FileNotFound error");
+        }
+
+        std::env::set_current_dir(orig_cwd).expect("Failed to reset CWD");
+    }
+    
+    #[test]
+    fn test_find_o_files(){
+        let dir = tempdir().expect("Failed to create temp dir");
+        
+        let file1 = dir.path().join("file1.o");
+        let file2 = dir.path().join("file2.o");
+        
+        File::create(&file1).expect("Failed to create file1");
+        File::create(&file2).expect("Failed to create file2");
+        
+        let other_file = dir.path().join("other_file.txt");
+        File::create(&other_file).expect("Failed to create other_file");
+        
+        let orig_cwd = std::env::current_dir().expect("Failed to get current directory");
+        std::env::set_current_dir(dir.path()).expect("Failed to set current directory");
+        
+        let result = find_o_files(Path::new("."));
+        assert_eq!(result.len(), 2);
+        assert!(result.contains(&PathBuf::from(normalize_path(&file1))));
+        assert!(result.contains(&PathBuf::from(normalize_path(&file2))));
+        assert!(!result.contains(&PathBuf::from(normalize_path(&other_file))));
+        
+        std::env::set_current_dir(orig_cwd).expect("Failed to reset CWD");
+    }
+    #[test]
+    #[should_panic(expected = "Failed to read forge/ directory")]
+    fn test_find_o_files_missing_dir(){
+        find_o_files(Path::new("missing_dir"));
+    }
+    
+    #[test]
+    fn test_normalize_path_strip_dot_slash() {
+        let path = Path::new("./test.txt");
+        let normalized = normalize_path(path);
+        assert_eq!(normalized, "test.txt");
+    }
+    #[test]
+    fn test_normalize_path_windows_unc_prefix() {
+        let path = Path::new(r"\\?\C:\Users\test.txt");
+        let normalized = normalize_path(path);
+        assert_eq!(normalized, "C:/Users/test.txt");
+    }
+    #[test]
+    fn test_normalize_path_backslashes() {
+        let path = Path::new(r"C:\folder\subfolder\file.o");
+        let normalized = normalize_path(path);
+        assert_eq!(normalized, "C:/folder/subfolder/file.o");
+    }
+
+    #[test]
+    fn test_normalize_path_no_prefix() {
+        let path = Path::new("folder/subfolder/file.o");
+        let normalized = normalize_path(path);
+        assert_eq!(normalized, "folder/subfolder/file.o");
+    }
+    
+    #[test]
+    fn test_get_forge_path_debug() {
+        let config = dummy_config(true);
+        let input = PathBuf::from("src/main.c");
+        let result = get_equivalent_forge_path(&input, &config, false).unwrap();
+        let expected = std::env::current_dir().unwrap().join("forge/debug/main.o");
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_get_forge_path_release() {
+        let config = dummy_config(false);
+        let input = PathBuf::from("src/utils.c");
+        let result = get_equivalent_forge_path(&input, &config, false).unwrap();
+        let expected = std::env::current_dir().unwrap().join("forge/release/utils.o");
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_get_forge_path_shared() {
+        let config = dummy_config(true); 
+        let input = PathBuf::from("src/libmath.c");
+        let result = get_equivalent_forge_path(&input, &config, true).unwrap();
+        let expected = std::env::current_dir().unwrap().join("forge/libs/obj/libmath.o");
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_invalid_utf8_filename() {
+        use std::ffi::OsStr;
+        #[cfg(unix)]
+        {
+            let config = dummy_config(false);
+            let bad_bytes = b"src/\xff.o";
+            let input_path = PathBuf::from(OsStr::from_bytes(bad_bytes));
+            let result = get_equivalent_forge_path(&input_path, &config, false);
+            assert!(result.is_err());
+        }
+    }
 }

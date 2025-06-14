@@ -4,7 +4,7 @@ use std::process::Command;
 use crate::fs_utils::*;
 use crate::config::{Config};
 use crate::hashes::{cache_hash, file_changed};
-use crate::ui::{print_melting, verbose_command, verbose_command_hard};
+use crate::ui::{print_heating, verbose_command, verbose_command_hard};
 use rayon::prelude::*;
 use colored::Colorize;
 use crate::arguments::Command::{Run, Rebuild};
@@ -34,7 +34,7 @@ pub fn compile_either(config: &Config, shared: bool) -> Result<(), String>{
     
     // compile all files (only gcc for now)
     if !files.is_empty() {
-        print_melting();
+        print_heating();
     }
     files.par_iter().enumerate().try_for_each(|(_, file)| -> Result<(), String> {
         let source_path = find_file(&file)

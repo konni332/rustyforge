@@ -112,8 +112,8 @@ pub fn print_forging(target: &str){
     println!("\x1b[1;38;5;208mForging...\n{}\x1b[0m", target);
 }
 
-pub fn print_melting(){
-    println!("{}", "\x1b[38;5;208mMelting...\x1b[0m".bold())
+pub fn print_heating(){
+    println!("{}", "\x1b[38;5;208mHeating...\x1b[0m".bold())
 }
 
 pub fn print_cleaning(){

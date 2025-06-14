@@ -139,4 +139,9 @@ Feel free to open issues or pull requests for questions, ideas, or contributions
 
 ## License
 
-MIT License
+This project is licensed under either of
+
+- MIT license ([LICENSE-MIT](./LICENSE-MIT) or https://opensource.org/license/MIT)
+- Apache license, Version 2.0 ([LICENSE-APACHE](./LICENSE-APACHE) or https://www.apache.org/license/LICENSE-2.0)
+
+at your option.

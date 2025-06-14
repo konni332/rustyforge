@@ -1,7 +1,14 @@
 [package]
 name = "rustyforge"
-version = "0.3.0"
+version = "0.3.1"
+authors = ["konni332"]
 edition = "2021"
+description = "A fast build tool for C, written in Rust"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/konni332/rustyforge"
+keywords = ["cli", "build", "C", "tool"]
+categories = ["command-line-utilities", "development-tools::build-utils"]
 
 [dependencies]
 serde = { version = "1.0.219", features = ["derive"]}

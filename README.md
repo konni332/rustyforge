@@ -1,4 +1,10 @@
-# rustyforge
+<div style="display: flex; justify-content: center; align-items: flex-start;">
+  <img src="RustyForge_logo_transparent.png" alt="RustyForge Logo" width="200">
+</div>
+
+
+
+# Rusty Forge
 
 RustyForge is a minimal, fast, and cross-platform build system for C.
 It’s designed for simplicity and ease of use, with modern features like toml-based configuration, parallel builds,

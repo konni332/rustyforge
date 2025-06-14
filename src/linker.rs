@@ -55,11 +55,13 @@ pub fn link_shared_library(cfg: &Config) -> Result<()>{
     for o_file in &o_files {
         cmd.arg(o_file);
     }
-    
-    let windows_arg = format!("-Wl,--out-implib,forge/libs/out/lib{}.dll.a", lib_name);
-    #[cfg(target_os = "windows")]
-    cmd.arg(windows_arg);
 
+    #[cfg(target_os = "windows")]
+    {
+        let windows_arg = format!("-Wl,--out-implib,forge/libs/out/lib{}.dll.a", lib_name);
+        cmd.arg(windows_arg);
+    }
+    
     print_forging(&lib_name);
     if cfg.args.verbose {
         verbose_command(&cmd);

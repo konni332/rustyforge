@@ -116,6 +116,8 @@ fn main() {
 }
 
 fn execute_target(config: &Config, cwd: &Path) {
+    // needs to mutable on windows!
+    #[allow(unused_mut)]
     let mut exe_name = config.forge.build.output.clone();
 
     // add .exe extension on windows

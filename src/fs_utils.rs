@@ -390,10 +390,9 @@ mod tests {
 
     #[test]
     fn test_invalid_utf8_filename() {
-        #[allow(unused_imports)]
-        use std::ffi::OsStr;
         #[cfg(unix)]
         {
+            use std::ffi::OsStr;
             let config = dummy_config(false);
             let bad_bytes = b"src/\xff.o";
             let input_path = PathBuf::from(OsStr::from_bytes(bad_bytes));

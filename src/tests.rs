@@ -61,6 +61,10 @@ mod integration_tests {
         let tests_path = cwd.join("tests").join("fixtures").join("valid_project");
         // make sure the build directory is empty
         let debug_path  = tests_path.join("forge").join("debug");
+        // create debug dir if it does not exist!
+        if !debug_path.exists() {
+            std::fs::create_dir_all(&debug_path).unwrap();
+        }
         clear_dir(&debug_path).unwrap();
         
         env::set_current_dir(&tests_path).unwrap();
@@ -78,7 +82,10 @@ mod integration_tests {
 
         let main_o_path = debug_path.join("main.o");
         let lib_o_path = debug_path.join("lib.o");
+        #[cfg(target_os = "windows")]
         let exe_path = debug_path.join("dummy.exe");
+        #[cfg(not(target_os = "windows"))]
+        let exe_path = debug_path.join("dummy");
         assert!(main_o_path.exists());
         assert!(lib_o_path.exists());
         assert!(exe_path.exists());

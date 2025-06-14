@@ -10,5 +10,17 @@
   {
     "path": "C:/Users/doepp/CLionProjects/rustyforge/tests/fixtures/valid_project/include/lib.h",
     "hash": "d2499077ab0508f5817fce783f60b6a9e36128999d882cd09e88755aa22d2b76"
+  },
+  {
+    "path": "/home/konni332/RustroverProjects/rustyforge/tests/fixtures/valid_project/lib.c",
+    "hash": "62cb3210e48dd6c3932bc2fd568b41b772f2163ad88646fa69eb6b413d1fca63"
+  },
+  {
+    "path": "/home/konni332/RustroverProjects/rustyforge/tests/fixtures/valid_project/main.c",
+    "hash": "f8d96a10467de3c8177101a032ac09b5c74b4db4c017c023e9de657819369504"
+  },
+  {
+    "path": "/home/konni332/RustroverProjects/rustyforge/tests/fixtures/valid_project/include/lib.h",
+    "hash": "b5f1d2e123f0042078a2956d6ecf3a5244ba85f2fa2651e76b00a50ff8898a5c"
   }
 ]

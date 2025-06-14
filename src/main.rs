@@ -25,6 +25,7 @@ mod discovery;
 fn main() {
     // parse command line arguments
     let mut args = ForgeArgs::parse();
+    
     // set default to debug if no other option is given
     if !&args.debug && !&args.release {
         args.debug = true;
@@ -155,18 +156,26 @@ fn clean(config: &Config, cwd: &Path) {
     print_cleaning();
     if config.args.debug {
         let path = cwd.join("forge").join("debug");
-        std::fs::remove_dir_all(path).expect("Error removing debug directory.");
+        if path.exists() {
+            std::fs::remove_dir_all(path).expect("Error removing debug directory.");
+        }
     }
     else if config.args.release {
         let path = cwd.join("forge").join("release");
-        std::fs::remove_dir_all(path).expect("Error removing release directory.");
+        if path.exists() {
+            std::fs::remove_dir_all(path).expect("Error removing release directory.");
+        }
     }
     
     let libs_path = cwd.join("forge").join("libs");
-    std::fs::remove_dir_all(libs_path).expect("Error removing libs directory.");
+    if libs_path.exists() {
+        std::fs::remove_dir_all(libs_path).expect("Error removing libs directory.");
+    }
     
     let json_path = cwd.join("forge").join(".forge").join("hash_cache.json");
-    std::fs::remove_file(json_path).expect("Error removing hash cache file.");
+    if json_path.exists()  {
+        std::fs::remove_file(json_path).expect("Error removing hash cache file.");
+    }
     // reinitialize empty hash_cache.json file
     if let Err(e) = init_hash_cache_json(std_hash_cache_path().expect("Error getting hash cache path.")){
         eprintln!("Error: {}", e);

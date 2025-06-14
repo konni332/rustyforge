@@ -1,5 +1,4 @@
 use std::process::Command;
-use colored::Colorize;
 use crate::utils::{format_command, strip_cwd};
 
 use crossterm::{
@@ -8,6 +7,7 @@ use crossterm::{
     style::{Color, Print, SetForegroundColor, ResetColor},
     terminal::{Clear, ClearType},
 };
+use crossterm::style::Stylize;
 use crate::arguments::DiscoverOptions;
 use crate::discovery::should_be_ignored;
 
@@ -23,7 +23,7 @@ pub fn verbose_command(cmd: &Command) {
     
     let clean_program = strip_cwd(&program, &cwd);
     
-    println!("[{}] Running: {} {}", "verbose".bold().bright_yellow() ,clean_program, clean_args);
+    println!("[{}] Running: {} {}", "verbose".bold().yellow() ,clean_program, clean_args);
 }
 
 pub fn verbose_command_hard(cmd: &Command) {
@@ -34,7 +34,7 @@ pub fn verbose_command_hard(cmd: &Command) {
         .collect::<Vec<String>>()
         .join(" ");
 
-    println!("[{}] Running (raw): {} {}", "verbose-hard".bold().bright_red(),program, args_string);
+    println!("[{}] Running (raw): {} {}", "verbose-hard".bold().red(),program, args_string);
 }
 
 pub fn event_file_found(options: &DiscoverOptions, name: &String) -> bool {

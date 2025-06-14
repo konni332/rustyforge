@@ -390,6 +390,7 @@ mod tests {
 
     #[test]
     fn test_invalid_utf8_filename() {
+        #[allow(unused_imports)]
         use std::ffi::OsStr;
         #[cfg(unix)]
         {

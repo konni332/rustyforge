@@ -26,7 +26,10 @@ pub struct ForgeArgs {
     /// specify the build profile as release
     #[arg(long, global = true, conflicts_with = "debug")]
     pub release: bool,
-
+    
+    #[arg(long, global = true)]
+    pub compiler: Option<String>,
+    
     #[command(subcommand)]
     pub command: Command,
 }

@@ -1,11 +1,15 @@
 use std::path::{Path};
 use crate::arguments::Command::Clean;
 use crate::arguments::ForgeArgs;
-use crate::config::{Build, Config, Forge, Project};
+use crate::config::{Build, CompilerKind, Config, Forge, Project};
 
+// usage is not recognized by rustfmt
+#[allow(dead_code)]
 pub fn dummy_config(debug: bool) -> Config {
     Config {
+        compiler: CompilerKind::GCC,
         args: ForgeArgs {
+            compiler: Some("gcc".to_string()),
             debug,
             release: !debug,
             verbose: false,
@@ -14,6 +18,7 @@ pub fn dummy_config(debug: bool) -> Config {
         },
         forge: Forge {
             build: Build {
+                compiler: Some("gcc".to_string()),
                 output: "dummy".to_string(),
                 cflags: None,
                 ldflags: None,
@@ -29,6 +34,8 @@ pub fn dummy_config(debug: bool) -> Config {
     }
 }
 
+// usage is not recognized by rustfmt
+#[allow(dead_code)]
 fn clear_dir(dir: &Path) -> std::io::Result<()> {
     if dir.is_dir() {
         for entry in std::fs::read_dir(dir)? {
@@ -61,7 +68,7 @@ mod integration_tests {
         let tests_path = cwd.join("tests").join("fixtures").join("valid_project");
         // make sure the build directory is empty
         let debug_path  = tests_path.join("forge").join("debug");
-        // create debug dir if it does not exist!
+        // create the debug dir if it does not exist!
         if !debug_path.exists() {
             std::fs::create_dir_all(&debug_path).unwrap();
         }

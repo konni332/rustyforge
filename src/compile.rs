@@ -2,7 +2,7 @@ use crate::utils::*;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use crate::fs_utils::*;
-use crate::config::{Config};
+use crate::config::{CompilerKind, Config};
 use crate::hashes::{cache_hash, file_changed};
 use crate::ui::{print_heating, verbose_command, verbose_command_hard};
 use rayon::prelude::*;
@@ -11,17 +11,22 @@ use crate::arguments::Command::{Run, Rebuild};
 
 
 pub fn compile(config: &Config) -> Result<(), String>{
+    if config.compiler == CompilerKind::MSVC{
+        return Err("MSVC not supported yet".to_string());   
+    }
+    
+    // gcc / clang is handled in compile_unix_like()
     let targets = &config.forge.project.targets;
     if targets.contains(&"shared".to_string()) {
-        compile_either(config, true)?;
+        compile_unix_like(config, true)?;
     }
     if targets.contains(&"static".to_string()) || targets.contains(&"bin".to_string()) {
-        compile_either(config, false)?;   
+        compile_unix_like(config, false)?;   
     }
     Ok(())
 }
 
-pub fn compile_either(config: &Config, shared: bool) -> Result<(), String>{
+pub fn compile_unix_like(config: &Config, shared: bool) -> Result<(), String>{
     let to_compile = get_files_to_compile(config, shared)?;
     let files: Vec<String> = to_compile.iter().map(|(f, _)| f.clone()).collect();
     let h_files: Vec<PathBuf> = to_compile.iter()
@@ -36,12 +41,22 @@ pub fn compile_either(config: &Config, shared: bool) -> Result<(), String>{
     if !files.is_empty() {
         print_heating();
     }
+    
     files.par_iter().enumerate().try_for_each(|(_, file)| -> Result<(), String> {
         let source_path = find_file(&file)
             .map_err(|_| format!("Could not find file: {}", file))?;
         let output_path = get_equivalent_forge_path(&source_path, &config, shared)?;
         
-        let mut cmd = Command::new("gcc");
+        let mut cmd;
+        if config.compiler == CompilerKind::GCC {
+            cmd = Command::new("gcc");
+        }
+        else if config.compiler == CompilerKind::Clang {
+            cmd = Command::new("clang");
+        }
+        else {
+            return Err("Compiler not supported".to_string());  
+        }
         
         // add target specific compiler flags
         if config.args.debug {

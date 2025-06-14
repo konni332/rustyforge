@@ -1,6 +1,6 @@
 use std::io::Write;
 use std::path::Path;
-use crate::config::{parse_forge_file, Config};
+use crate::config::{Config};
 use crate::fs_utils::{create_forge_sub_dir, ensure_necessary_files, init_forge_structure, init_hash_cache_json, std_hash_cache_path, std_toml_path};
 use crate::arguments::ForgeArgs;
 use clap::Parser;
@@ -39,79 +39,69 @@ fn main() {
             std::process::exit(1);
         }
     };
-    
-    let config: Config;
-    // don't check project structure if init command is used (obviously)
-    if args.command != Init {
-        if let Err(e) = ensure_necessary_files() {
-            eprintln!("Error: {}", e);
-            std::process::exit(1);
-        }
-        let toml_path = Path::new("RustyForge.toml");
-        let forge = parse_forge_file(toml_path.to_str().unwrap())
-            .expect("Error parsing forge file. Format might be wrong.");
-        config = Config {
-            forge,
-            args: args.clone(),
-        };
-        
-        let targets = &config.forge.project.targets;
-        if targets.iter().any(|t| t == "static" || t == "shared") {
-            for dir in ["libs/out", "libs/obj"] {
-                if let Err(e) = create_forge_sub_dir(dir) {
-                    eprintln!("Error creating {}: {}", dir, e);
-                    std::process::exit(1);
-                }
-            }
-        }
-        
-        if args.debug {
-            if let Err(e) = create_forge_sub_dir("debug") {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
-            }
-        }
-        else if args.release {
-            if let Err(e) = create_forge_sub_dir("release") {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
-            }
-        }
-        
-        match &args.command {
-            Build => {
-                compile(&config).expect("Error compiling.");
-                link(&config).expect("Error linking.");
-            }
-            Rebuild => {
-                clean(&config, &cwd);
-                compile(&config).expect("Error compiling.");
-                link(&config).expect("Error linking.");
-            }
-            Run(_) => {
-                compile(&config).expect("Error compiling.");
-                link(&config).expect("Error linking.");
-                execute_target(&config, &cwd);
-            }
-            Clean => {
-                clean(&config, &cwd);
-            }
-            Discover(options) => {
-                discover(&options, std_toml_path()
-                    .expect("Error generating standard .toml path")
-                ).expect("Error discovering.");
-            }
-            _ => {
-                print!("Hi! This will never be printed.")
-            } // not necessary, just for compiler error suppression
-        }
-    }
-    // initialize forge structure if init command is used
-    else {
+    if args.command == Init {
         if let Err(e) = init_forge_structure() {
             eprintln!("Error: {}", e);
             std::process::exit(1);
         }
+        std::process::exit(0);
+    }
+    if let Err(e) = ensure_necessary_files() {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
+    
+    let config = Config::read(&args);
+    
+    let targets = &config.forge.project.targets;
+    if targets.iter().any(|t| t == "static" || t == "shared") {
+        for dir in ["libs/out", "libs/obj"] {
+            if let Err(e) = create_forge_sub_dir(dir) {
+                eprintln!("Error creating {}: {}", dir, e);
+                std::process::exit(1);
+            }
+        }
+    }
+    
+    if args.debug {
+        if let Err(e) = create_forge_sub_dir("debug") {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
+    }
+    else if args.release {
+        if let Err(e) = create_forge_sub_dir("release") {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
+    }
+    
+    match &args.command {
+        Build => {
+            compile(&config).expect("Error compiling.");
+            link(&config).expect("Error linking.");
+        }
+        Rebuild => {
+            clean(&config, &cwd);
+            compile(&config).expect("Error compiling.");
+            link(&config).expect("Error linking.");
+        }
+        Run(_) => {
+            compile(&config).expect("Error compiling.");
+            link(&config).expect("Error linking.");
+            execute_target(&config, &cwd);
+        }
+        Clean => {
+            clean(&config, &cwd);
+        }
+        Discover(options) => {
+            discover(&options, std_toml_path()
+                .expect("Error generating standard .toml path")
+            ).expect("Error discovering.");
+        }
+        _ => {
+            print!("Hi! This will never be printed.")
+        } // not necessary, just for compiler error suppression
     }
 }
 

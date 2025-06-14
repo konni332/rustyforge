@@ -116,7 +116,7 @@ posix_libraries = ["m", "pthreads"]
 - **Target:** `rustyforge.exe rebuild`
 - **Runs:** 10 
 - *Every run cleans build artifacts and rebuilds [forksta](https://github.com/konni332/forksta)
-    as shared library and executable*
+    as shared a library and executable*
 - *Measured with [forksta](https://github.com/konni332/forksta)*
 
 ### Performance Summary

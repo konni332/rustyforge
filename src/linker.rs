@@ -1,15 +1,20 @@
 use std::path::Path;
 use std::process::Command;
-use crate::config::{Config};
+use crate::config::{CompilerKind, Config};
 use crate::utils::{format_lib_name, is_valid_ldflag, format_shared_lib_name};
 use crate::ui::{print_forging, verbose_command, verbose_command_hard};
 use anyhow::{bail, Result};
+use crate::compile::get_compiler_cmd;
 use crate::fs_utils::{create_forge_sub_dir, normalize_path, find_o_files};
 
 #[allow(unused_imports)] // is imported for linux and macOS
 use crate::fs_utils::{find_file, find_r_paths};
 
 pub fn link(config: &Config) -> Result<()>{
+    if config.compiler == CompilerKind::MSVC {
+        bail!("MSVC is not supported yet");
+    }
+    // clang / gcc is handled by the link() function
     // check all targets
     for target in &config.forge.project.targets {
         match target.as_str() {
@@ -44,7 +49,11 @@ pub fn link_shared_library(cfg: &Config) -> Result<()>{
     
     create_forge_sub_dir("libs/out")?;
     
-    let mut cmd = Command::new("gcc");
+    let mut cmd= match get_compiler_cmd(&cfg) {
+        Ok(cmd) => cmd,
+        Err(e) => bail!("Failed to get compiler command: {}", e)
+    };
+    
     let o_path = Path::new("forge/libs/obj");
     let o_files = find_o_files(o_path);
     
@@ -155,7 +164,11 @@ pub fn link_executable(config: &Config) -> Result<()> {
         target_path = cwd.join("forge").join("release").join(target_executable);
     }
     
-    let mut cmd = Command::new("gcc");
+    let mut cmd= match get_compiler_cmd(&config) {
+        Ok(cmd) => cmd,
+        Err(e) => bail!("Failed to get compiler command: {}", e)
+    };
+    
     // add all object files
     for o_file in o_files {
         cmd.arg(o_file);

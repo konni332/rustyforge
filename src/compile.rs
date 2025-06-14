@@ -179,12 +179,11 @@ pub fn get_files_to_compile(config: &Config, shared: bool)
     Ok(to_compile)
 }
 
-fn gcc_mm(relpath: &Path, config: &Config) -> Result<String, String> {
-    let mut cmd = Command::new("gcc");
+fn gcc_clang_mm(relpath: &Path, config: &Config) -> Result<String, String> {
+    let mut cmd = get_compiler_cmd(config)?;
+    let mm_path = normalize_path(relpath);
     
-    let gcc_path = normalize_path(relpath);
-    
-    cmd.arg("-MM").arg(gcc_path);
+    cmd.arg("-MM").arg(mm_path);
     for dir in &config.forge.build.include_dirs {
         cmd.arg(format!("-I{}", dir.clone()));
     }
@@ -216,7 +215,7 @@ fn gcc_mm(relpath: &Path, config: &Config) -> Result<String, String> {
 }
 
 fn parse_h_dependencies(relpath: &Path, config: &Config) -> Result<Vec<PathBuf>, String> {
-    let output = gcc_mm(relpath, config)?;
+    let output = gcc_clang_mm(relpath, config)?;
     let parts: Vec<&str> = output.split(':').collect();
     if parts.len() != 2 {
         return Err(format!("Could not parse gcc output: {}", output).to_string());
@@ -250,7 +249,17 @@ fn parse_h_dependencies(relpath: &Path, config: &Config) -> Result<Vec<PathBuf>,
 }
 
 
-
+pub fn get_compiler_cmd(config: &Config) -> Result<Command, String> {
+    if config.compiler == CompilerKind::GCC {
+        Ok(Command::new("gcc"))
+    }
+    else if config.compiler == CompilerKind::Clang {
+        Ok(Command::new("clang"))
+    }
+    else {
+        return Err("Compiler not supported".to_string());  
+    }
+}
 
 
 

@@ -32,7 +32,10 @@ jobs:
           toolchain: stable-x86_64-pc-windows-gnu
           profile: minimal
           override: true
-
+      - name: Install LLVM (clang)
+        if: runner.os == 'Windows'
+        run: choco install llvm -y
+        
       - name: Check Rust version
         run: rustc -vV
 

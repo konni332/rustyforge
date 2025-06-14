@@ -62,7 +62,7 @@ mod integration_tests {
     use super::*;
     
     #[test]
-    fn test_valid_project(){
+    fn test_valid_project_gcc(){
         let cwd = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let org_cwd = cwd.clone();
         let tests_path = cwd.join("tests").join("fixtures").join("valid_project");
@@ -104,7 +104,7 @@ mod integration_tests {
     }
     
     #[test]
-    fn test_broken_project(){
+    fn test_broken_project_gcc(){
         let cwd = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let org_cwd = cwd.clone();
         let tests_path = cwd.join("tests").join("fixtures").join("broken_project");
@@ -118,7 +118,70 @@ mod integration_tests {
         config.forge.build.src.push("main.c".to_string());
         
         
-        
+        let compile_res = compile(&config);
+        assert!(compile_res.is_err());
+        env::set_current_dir(org_cwd).unwrap();
+    }
+    #[test]
+    fn test_valid_project_clang(){
+        let cwd = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let org_cwd = cwd.clone();
+        let tests_path = cwd.join("tests").join("fixtures").join("valid_project");
+        // make sure the build directory is empty
+        let debug_path  = tests_path.join("forge").join("debug");
+        // create the debug dir if it does not exist!
+        if !debug_path.exists() {
+            std::fs::create_dir_all(&debug_path).unwrap();
+        }
+        clear_dir(&debug_path).unwrap();
+
+        env::set_current_dir(&tests_path).unwrap();
+
+        let mut config = dummy_config(true);
+        config.forge.build.src.push("lib.c".to_string());
+        config.forge.build.src.push("main.c".to_string());
+        config.forge.build.include_dirs.push("include".to_string());
+        // set compiler to clang
+        config.compiler = CompilerKind::Clang;
+
+        let compile_res = compile(&config);
+        assert!(compile_res.is_ok());
+
+        let link_res = link(&config);
+        assert!(link_res.is_ok());
+
+        let main_o_path = debug_path.join("main.o");
+        let lib_o_path = debug_path.join("lib.o");
+        #[cfg(target_os = "windows")]
+        let exe_path = debug_path.join("dummy.exe");
+        #[cfg(not(target_os = "windows"))]
+        let exe_path = debug_path.join("dummy");
+        assert!(main_o_path.exists());
+        assert!(lib_o_path.exists());
+        assert!(exe_path.exists());
+
+        // delete the build contents
+        clear_dir(&debug_path).unwrap();
+
+        env::set_current_dir(org_cwd).unwrap();
+    }
+
+    #[test]
+    fn test_broken_project_clang(){
+        let cwd = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let org_cwd = cwd.clone();
+        let tests_path = cwd.join("tests").join("fixtures").join("broken_project");
+        // make sure the build directory is empty
+        let debug_path  = tests_path.join("forge").join("debug");
+        clear_dir(&debug_path).unwrap();
+
+        env::set_current_dir(&tests_path).unwrap();
+
+        let mut config = dummy_config(true);
+        config.forge.build.src.push("main.c".to_string());
+        // set compiler to clang
+        config.compiler = CompilerKind::Clang;
+
         let compile_res = compile(&config);
         assert!(compile_res.is_err());
         env::set_current_dir(org_cwd).unwrap();

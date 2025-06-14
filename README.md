@@ -23,7 +23,7 @@ Ideal for both beginners and experienced developers looking for a streamlined al
 - Linking `.o` files into the final executable  
 - Support for linking and building static (`.a`) and dynamic (`.so`/`.dll`) libraries
 - Cross-platform support (Windows/Linux) with proper handling of paths and executable extensions
-- Uses `gcc` as the compiler
+- Uses `gcc` or `clang` as the compiler (can either be specified in TOML or with `--compiler`)
 
 ---
 
@@ -31,8 +31,7 @@ Ideal for both beginners and experienced developers looking for a streamlined al
 
 - Test targets and automated test execution 
 - Cross compilation
-- Support for more compilers (`clang` `tcc`)
-- Support for non gcc-based toolchains
+- Support for MSCV
 
 ---
 

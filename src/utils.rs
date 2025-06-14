@@ -1,9 +1,46 @@
 use std::path::Path;
 use std::process::Command;
+use crate::config::{CompilerKind, Config};
+use crossterm::style::{Stylize};
 
+pub fn check_compiler(cfg: &mut Config) {
+    let comp = cfg.compiler;
+    let available = match comp {
+        CompilerKind::GCC => is_gcc_available(),
+        CompilerKind::Clang => is_clang_available(),
+        CompilerKind::MSVC => false, // TODO: Implement MSVC support
+    };
+    if !available {
+        eprintln!("Compiler is not available: {}", comp.to_string().red());
+        println!("Trying fallback to default compiler: gcc");
+        if is_gcc_available() {
+            cfg.compiler = CompilerKind::GCC;
+        } else {
+            eprintln!("[{}]", "Fallback compiler not found!\nAborting...".red());
+            std::process::exit(1);
+        }   
+    }  
+}
+
+fn is_clang_available() -> bool {
+    Command::new("clang")
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+
+fn is_gcc_available() -> bool {
+    Command::new("gcc")
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
 
 pub fn is_valid_cflag(flag: &str) -> bool {
-    let forbidden = ["-Wall", "-Wextra", "-DDEBUG", "-DNDEBUG"];
+    let forbidden = ["-Wall", "-Wextra", "-DDEBUG", "-DNDEBUG", "-DRELEASE"];
 
     if forbidden.contains(&flag) {
         eprintln!("Warning: Flag '{}' is handled internally and should not be set explicitly.", flag);

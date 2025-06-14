@@ -1,7 +1,9 @@
+use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use crate::ForgeArgs;
 use crate::fs_utils::std_toml_path;
+use crate::utils::check_compiler;
 
 pub struct Config {
     pub forge: Forge,
@@ -9,11 +11,21 @@ pub struct Config {
     pub compiler: CompilerKind,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum CompilerKind {
     GCC,
     Clang,
     MSVC,
+}
+
+impl Display for CompilerKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CompilerKind::GCC => write!(f, "gcc"),
+            CompilerKind::Clang => write!(f, "clang"),
+            CompilerKind::MSVC => write!(f, "msvc"),
+        }
+    }   
 }
 
 fn determine_compiler_kind(forge: &Forge, args: &ForgeArgs) -> CompilerKind {
@@ -56,8 +68,9 @@ impl Config {
             .expect("Could not parse TOML file");
         
         let compiler = determine_compiler_kind(&forge, args);
-        
-        Self { forge, args: args.clone(), compiler }
+        let mut cfg = Config { forge, args: args.clone(), compiler };
+        check_compiler(&mut cfg);
+        cfg
     }
 }
 

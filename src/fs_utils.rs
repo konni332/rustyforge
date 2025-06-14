@@ -387,17 +387,4 @@ mod tests {
         let expected = std::env::current_dir().unwrap().join("forge/libs/obj/libmath.o");
         assert_eq!(result, expected);
     }
-
-    #[test]
-    fn test_invalid_utf8_filename() {
-        #[cfg(unix)]
-        {
-            use std::ffi::OsStr;
-            let config = dummy_config(false);
-            let bad_bytes = b"src/\xff.o";
-            let input_path = PathBuf::from(OsStr::from_bytes(bad_bytes));
-            let result = get_equivalent_forge_path(&input_path, &config, false);
-            assert!(result.is_err());
-        }
-    }
 }

@@ -47,6 +47,13 @@ Ideal for both beginners and experienced developers looking for a streamlined al
 
 ## Installation
 
+### Run
+````shell
+cargo install rustyforge
+````
+
+### Alternative
+
 1. Clone rustyforge repository  
 2. Install Rust toolchain (Rust 1.70 or newer recommended)  
 3. Run `cargo build --release`  

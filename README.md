@@ -1,5 +1,5 @@
 <div style="display: flex; justify-content: center; align-items: flex-start;">
-  <img src="RustyForge_logo_transparent.png" alt="RustyForge Logo" width="200">
+  <img src="assets/RustyForge_logo_transparent.png" alt="RustyForge Logo" width="200">
 </div>
 
 
@@ -71,6 +71,12 @@ rustyforge discover
 rustyforge build --verbose
 rustyforge clean
 ````
+
+<div style="padding: 10px; max-width: 700px; margin: 0;">
+  <img src="./assets/demo.gif" alt="RustyForge CLI Demo" style="width: 100%; border-radius: 8px; box-shadow: 0 0 8px rgba(0,0,0,0.2);" />
+</div>
+
+
 
 ---
 

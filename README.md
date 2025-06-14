@@ -6,6 +6,9 @@
 
 # Rusty Forge
 
+![crates.io](https://img.shields.io/crates/v/rustyforge.svg)
+![Build Status](https://github.com/konni332/rustyforge/actions/workflows/ci.yml/badge.svg)
+
 RustyForge is a minimal, fast, and cross-platform build system for C.
 It’s designed for simplicity and ease of use, with modern features like toml-based configuration, parallel builds,
 and hash-based caching.

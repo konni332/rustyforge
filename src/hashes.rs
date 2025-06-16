@@ -48,11 +48,11 @@ pub fn get_cached_hash(filepath: &Path, json_path: PathBuf) -> Option<String> {
     None
 }
 
-pub fn cache_hash(filepath: &Path, json_path: PathBuf) -> Result<(), String> {
-    let hash = hash(filepath).map_err(|e| e.to_string())?;
+pub fn cache_hash(filepath: &Path, json_path: PathBuf) -> Result<()> {
+    let hash = hash(filepath)?;
     
-    let mut entries = load_hash_cache_json(std_hash_cache_path().unwrap())
-        .map_err(|e| e.to_string())?;
+    let mut entries = load_hash_cache_json(std_hash_cache_path()?)
+        .expect("Failed to load hash cache");
     
     let norm_path = normalize_path(filepath);
     
@@ -70,8 +70,7 @@ pub fn cache_hash(filepath: &Path, json_path: PathBuf) -> Result<(), String> {
             hash,
         });
     }
-    save_hash_cache_json(&entries, json_path)
-        .map_err(|e| e.to_string())?;
+    save_hash_cache_json(&entries, json_path).expect("Failed to save hash cache");
     Ok(())
 }
 

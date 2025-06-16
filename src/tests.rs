@@ -1,6 +1,6 @@
 use std::path::{Path};
-use crate::arguments::Command::{Clean, Rebuild};
-use crate::arguments::{BuildOptions, CleanOptions, ForgeArgs};
+use crate::arguments::Command::{Rebuild};
+use crate::arguments::{BuildOptions, ForgeArgs};
 use crate::config::{Build, CompilerKind, Config, Forge, Project};
 
 // usage is not recognized by rustfmt

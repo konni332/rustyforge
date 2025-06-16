@@ -8,11 +8,11 @@ use crate::ui::{print_heating, verbose_command, verbose_command_hard};
 use rayon::prelude::*;
 use colored::Colorize;
 use crate::arguments::Command::{Run, Rebuild};
+use anyhow::{Result, bail, Context};
 
-
-pub fn compile(config: &Config) -> Result<(), String>{
+pub fn compile(config: &Config) -> Result<()>{
     if config.compiler == CompilerKind::MSVC{
-        return Err("MSVC not supported yet".to_string());   
+        bail!("MSVC is not supported yet");   
     }
     
     // gcc / clang is handled in compile_unix_like()
@@ -26,15 +26,14 @@ pub fn compile(config: &Config) -> Result<(), String>{
     Ok(())
 }
 
-pub fn compile_unix_like(config: &Config, shared: bool) -> Result<(), String>{
+pub fn compile_unix_like(config: &Config, shared: bool) -> Result<()>{
     let to_compile = get_files_to_compile(config, shared)?;
     let files: Vec<String> = to_compile.iter().map(|(f, _)| f.clone()).collect();
     let h_files: Vec<PathBuf> = to_compile.iter()
         .flat_map(|(_, h)| h.clone()).collect();
     
     if shared {
-        create_forge_sub_dir("libs/obj")
-            .map_err(|e| format!("Could not create forge sub dir: {}", e))?;
+        create_forge_sub_dir("libs/obj")?;
     }
     
     // compile all files (only gcc for now)
@@ -42,9 +41,9 @@ pub fn compile_unix_like(config: &Config, shared: bool) -> Result<(), String>{
         print_heating();
     }
     
-    files.par_iter().enumerate().try_for_each(|(_, file)| -> Result<(), String> {
+    files.par_iter().enumerate().try_for_each(|(_, file)| -> Result<()> {
         let source_path = find_file(&file)
-            .map_err(|_| format!("Could not find file: {}", file))?;
+            .map_err(|e| anyhow::Error::new(e))?;
         let output_path = get_equivalent_forge_path(&source_path, &config, shared)?;
         
         let mut cmd;
@@ -55,7 +54,7 @@ pub fn compile_unix_like(config: &Config, shared: bool) -> Result<(), String>{
             cmd = Command::new("clang");
         }
         else {
-            return Err("Compiler not supported".to_string());  
+            bail!(format!("Compiler not supported: {}", config.compiler))  
         }
         
         // add target specific compiler flags
@@ -98,7 +97,7 @@ pub fn compile_unix_like(config: &Config, shared: bool) -> Result<(), String>{
                 "Furnace not hot enough! Error compiling file: {}:\n{}",
                 file, String::from_utf8_lossy(&output.stderr)
             );
-            return Err("Error compiling file".to_string());
+            bail!("Error compiling file: {}", file)
         }
         else {
             println!("[{}]", &file.green())
@@ -107,10 +106,8 @@ pub fn compile_unix_like(config: &Config, shared: bool) -> Result<(), String>{
     })?;
     // cache .c hashes
     for c_file in &config.forge.build.src {
-        let absolut_path = find_file(&c_file)
-            .map_err(|_| format!("Could not find file: {}", c_file))?;
-        cache_hash(&absolut_path, std_hash_cache_path()
-            .expect("Could not get std hash cache path"))?;      
+        let absolut_path = find_file(&c_file)?;
+        cache_hash(&absolut_path, std_hash_cache_path()?)?;      
     }
     // cache .h hashes
     for h_file in &h_files {
@@ -121,17 +118,17 @@ pub fn compile_unix_like(config: &Config, shared: bool) -> Result<(), String>{
 }
 
 pub fn get_files_to_compile(config: &Config, shared: bool)
-    -> Result<Vec<(String, Vec<PathBuf>)>, String> 
+    -> Result<Vec<(String, Vec<PathBuf>)>> 
 {
     let mut to_compile= Vec::new();
     
     for c_file in &config.forge.build.src {
         // get all relevant file paths
-        let c_file_path = find_file(&c_file)
-            .map_err(|_| format!("Could not find file: {}", c_file))?;
-        let o_file_path = get_equivalent_forge_path(&c_file_path, &config, shared)?;
+        let c_file_path = find_file(&c_file)?;
+        let o_file_path = get_equivalent_forge_path(&c_file_path, &config, shared).with_context(|| 
+            format!("Could not get equivalent forge path for file: {}", c_file))?;
         let h_files = parse_h_dependencies(Path::new(c_file), &config)
-            .map_err(|_| format!("Could not parse header dependencies for file: {}", c_file))?;
+            .with_context(|| format!("Could not parse dependencies for file: {}", c_file))?;
         let mut compile = false;
         // if command ist rebuild, compile all files
         match &config.args.command {
@@ -151,7 +148,7 @@ pub fn get_files_to_compile(config: &Config, shared: bool)
         // if the c file has changed, compile
         if file_changed(&c_file_path, std_hash_cache_path()
                 .expect("Could not get std hash cache path"))
-            .map_err(|_| format!("Could not check if file changed: {}", c_file))? 
+            .with_context(|| format!("Could not check if file changed: {}", c_file))? 
         {
             compile = true;    
         }
@@ -159,7 +156,7 @@ pub fn get_files_to_compile(config: &Config, shared: bool)
         for h_file in &h_files {
             if file_changed(&h_file, std_hash_cache_path()
                     .expect("Could not get std hash cache path"))
-                .map_err(|_| format!("Could not check if file changed: {}", h_file.display()))? 
+                .with_context(|| format!("Could not check if file changed: {}", h_file.display()))? 
             {
                 compile = true;
                 break;
@@ -174,7 +171,7 @@ pub fn get_files_to_compile(config: &Config, shared: bool)
     Ok(to_compile)
 }
 
-fn gcc_clang_mm(relpath: &Path, config: &Config) -> Result<String, String> {
+fn gcc_clang_mm(relpath: &Path, config: &Config) -> Result<String> {
     let mut cmd = get_compiler_cmd(config)?;
     let mm_path = normalize_path(relpath);
     
@@ -190,30 +187,25 @@ fn gcc_clang_mm(relpath: &Path, config: &Config) -> Result<String, String> {
         verbose_command_hard(&cmd);  
     }
     
-    let output = cmd.output()
-        .map_err(|e| format!("Command Error: {}", e).to_string())?;
+    let output = cmd.output()?;
     
     if output.status.success() {
-        let stdout = String::from_utf8(output.stdout)
-            .map_err(
-                |e| format!("Could not convert stdout to string: {}", e).to_string()
-            )?;
+        let stdout = String::from_utf8(output.stdout).with_context(|| 
+            format!("Could not convert stdout to string: {}", relpath.display()))?;
         Ok(stdout)
     }
     else {
         let stderr = String::from_utf8(output.stderr)
-            .map_err(
-                |e| format!("Could not convert stderr to string: {}", e).to_string()
-            )?;
-        Err(format!("gcc Error: {}", stderr).to_string())
+            .with_context(|| format!("Could not convert stderr to string: {}", relpath.display()))?;
+        bail!(format!("Error compiling file: {}", stderr)); 
     }
 }
 
-fn parse_h_dependencies(relpath: &Path, config: &Config) -> Result<Vec<PathBuf>, String> {
+fn parse_h_dependencies(relpath: &Path, config: &Config) -> Result<Vec<PathBuf>> {
     let output = gcc_clang_mm(relpath, config)?;
     let parts: Vec<&str> = output.split(':').collect();
     if parts.len() != 2 {
-        return Err(format!("Could not parse gcc/clang output: {}", output).to_string());
+        bail!(format!("Could not parse compiler output: {}", output));  
     }
     
     let deps_str = parts[1];
@@ -233,8 +225,7 @@ fn parse_h_dependencies(relpath: &Path, config: &Config) -> Result<Vec<PathBuf>,
                 path.to_path_buf()
             }
             else { 
-                cwd.join(path).canonicalize()
-                    .map_err(|e| format!("Could not canonicalize path: {}", e).to_string())?
+                cwd.join(path).canonicalize()?
             };
             deps_paths.push(abs_path);
         }
@@ -244,7 +235,7 @@ fn parse_h_dependencies(relpath: &Path, config: &Config) -> Result<Vec<PathBuf>,
 }
 
 
-pub fn get_compiler_cmd(config: &Config) -> Result<Command, String> {
+pub fn get_compiler_cmd(config: &Config) -> Result<Command> {
     if config.compiler == CompilerKind::GCC {
         Ok(Command::new("gcc"))
     }
@@ -252,7 +243,7 @@ pub fn get_compiler_cmd(config: &Config) -> Result<Command, String> {
         Ok(Command::new("clang"))
     }
     else {
-        return Err("Compiler not supported".to_string());  
+        bail!(format!("Compiler not supported: {}", config.compiler))  
     }
 }
 

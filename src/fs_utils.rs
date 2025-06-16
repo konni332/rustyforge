@@ -21,6 +21,17 @@ pub enum FileError {
     CwdError(String),
 }
 
+impl std::fmt::Display for FileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FileError::FileNotFound(msg) => write!(f, "File not found: {}", msg),
+            FileError::FileError(msg) => write!(f, "File error: {}", msg),
+            FileError::CwdError(msg) => write!(f, "CWD error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for FileError {}
 pub fn find_file(filename: &str) -> Result<PathBuf, FileError> {
     let cwd = std::env::current_dir().map_err(|e| FileError::CwdError(format!("CWD Error: {}", e)))?;
     let full_path = cwd.join(filename);
@@ -33,10 +44,10 @@ pub fn find_file(filename: &str) -> Result<PathBuf, FileError> {
     }
 }
 
-pub fn get_equivalent_forge_path(input_path: &Path, config: &Config, shared: bool) -> Result<PathBuf, String> {
-    let cwd = std::env::current_dir().map_err(|e| format!("CWD Error: {}", e))?;
+pub fn get_equivalent_forge_path(input_path: &Path, config: &Config, shared: bool) -> Result<PathBuf> {
+    let cwd = std::env::current_dir()?;
     let file_stem = input_path.file_stem().and_then(|s| s.to_str())
-        .ok_or("File stem not valid UTF-8")?;
+        .ok_or(anyhow::anyhow!("Failed to get file stem"))?;
     
     let forge_path: PathBuf;
     if shared { 
@@ -67,7 +78,7 @@ pub fn get_equivalent_forge_path(input_path: &Path, config: &Config, shared: boo
                 cwd.join("forge").join(build_type).join(format!("{}.o", file_stem))
             }
             _ => {
-                Err("Invalid command")?
+                bail!("Invalid command")
             }
         }
     }

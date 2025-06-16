@@ -5,7 +5,6 @@ use crate::ForgeArgs;
 use crate::fs_utils::std_toml_path;
 use crate::utils::check_compiler;
 use crate::arguments::Command::*;
-use crate::config::CompilerKind::GCC;
 
 pub struct Config {
     pub forge: Forge,

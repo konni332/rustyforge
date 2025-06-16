@@ -1,7 +1,16 @@
 use std::io::Write;
 use std::path::Path;
+use anyhow::{Context, Result};
 use crate::config::{Config};
-use crate::fs_utils::{create_build_dir, create_forge_sub_dir, ensure_necessary_files, init_forge_structure, init_hash_cache_json, std_hash_cache_path, std_toml_path};
+use crate::fs_utils::{
+    create_build_dir,
+    create_forge_sub_dir,
+    ensure_necessary_files,
+    init_forge_structure,
+    init_hash_cache_json,
+    std_hash_cache_path,
+    std_toml_path};
+
 use crate::arguments::{set_command_defaults, CleanOptions, ForgeArgs, RunOptions};
 use clap::Parser;
 use crate::arguments::Command::{Build, Run, Rebuild, Clean, Init, Discover};
@@ -22,7 +31,7 @@ mod ui;
 mod arguments;
 mod discovery;
 
-fn main() {
+fn main() -> Result<()>{
     // parse command line arguments
     let mut args = ForgeArgs::parse();
     
@@ -68,18 +77,18 @@ fn main() {
     
     match args.command.clone() {
         Build(_) => {
-            compile(&config).expect("Error compiling.");
-            link(&config).expect("Error linking.");
+            compile(&config).context("Error compiling");
+            link(&config).expect("Error linking");
         }
         Rebuild(opt) => {
             let mut clean_opt = derive_clean_options(&opt);
             clean(&cwd, &mut clean_opt);
-            compile(&config).expect("Error compiling.");
-            link(&config).expect("Error linking.");
+            compile(&config).expect("Error compiling");
+            link(&config).expect("Error linking");
         }
         Run(mut opt) => {
-            compile(&config).expect("Error compiling.");
-            link(&config).expect("Error linking.");
+            compile(&config).expect("Error compiling");
+            link(&config).expect("Error linking");
             execute_target(&config, &cwd, &mut opt);
         }
         Clean(mut opt) => {
@@ -94,6 +103,7 @@ fn main() {
             print!("Hi! This will never be printed.")
         } // not necessary, just for compiler error suppression
     }
+    Ok(())
 }
 
 fn execute_target(config: &Config, cwd: &Path, opt: &mut RunOptions) {

@@ -55,6 +55,7 @@ mod integration_tests {
     use std::env;
     use std::path::PathBuf;
     use crate::compile::compile;
+    use crate::fs_utils::init_hash_cache_json;
     use crate::linker::link;
     use super::*;
     
@@ -77,6 +78,8 @@ mod integration_tests {
         config.forge.build.src.push("lib.c".to_string());
         config.forge.build.src.push("main.c".to_string());
         config.forge.build.include_dirs.push("include".to_string());
+
+        init_hash_cache_json(tests_path.join("forge").join(".forge")).unwrap();
         
         let compile_res = compile(&config);
         assert!(compile_res.is_ok());
@@ -113,7 +116,8 @@ mod integration_tests {
 
         let mut config = dummy_config(true);
         config.forge.build.src.push("main.c".to_string());
-        
+
+        init_hash_cache_json(tests_path.join("forge").join(".forge")).unwrap();
         
         let compile_res = compile(&config);
         assert!(compile_res.is_err());
@@ -140,7 +144,9 @@ mod integration_tests {
         config.forge.build.include_dirs.push("include".to_string());
         // set compiler to clang
         config.compiler = CompilerKind::Clang;
-
+        
+        init_hash_cache_json(tests_path.join("forge").join(".forge")).unwrap();
+        
         let compile_res = compile(&config);
         assert!(compile_res.is_ok());
 
@@ -179,6 +185,8 @@ mod integration_tests {
         // set compiler to clang
         config.compiler = CompilerKind::Clang;
 
+        init_hash_cache_json(tests_path.join("forge").join(".forge")).unwrap();
+        
         let compile_res = compile(&config);
         assert!(compile_res.is_err());
         env::set_current_dir(org_cwd).unwrap();

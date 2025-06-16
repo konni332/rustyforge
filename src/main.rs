@@ -77,7 +77,7 @@ fn main() -> Result<()>{
     
     match args.command.clone() {
         Build(_) => {
-            compile(&config).context("Error compiling");
+            compile(&config).context("Error compiling")?;
             link(&config).expect("Error linking");
         }
         Rebuild(opt) => {
@@ -154,13 +154,13 @@ fn clean(cwd: &Path, opt: &mut CleanOptions) {
             std::fs::remove_dir_all(path).expect("Error removing debug directory.");
         }
     }
-    else if opt.release {
+    if opt.release {
         let path = cwd.join("forge").join("release");
         if path.exists() {
             std::fs::remove_dir_all(path).expect("Error removing release directory.");
         }
     }
-    else if opt.libs {
+    if opt.libs {
         let libs_path = cwd.join("forge").join("libs");
         if libs_path.exists() {
             std::fs::remove_dir_all(libs_path).expect("Error removing libs directory.");

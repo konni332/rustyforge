@@ -16,3 +16,5 @@
 
 # Test C Projekt ignorieren
 /test-c-project/
+**/hash_cache.json
+

@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand, Args};
 #[command(
     name = "rustyforge",
     about = "A simple, lightweight build tool for C",
-    version = "0.4.0",
+    version = "0.4.1",
     author = "<konni332>",
     subcommand_required = true,
     arg_required_else_help = true,

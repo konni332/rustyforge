@@ -5,7 +5,8 @@ use crate::utils::{format_lib_name, is_valid_ldflag, format_shared_lib_name};
 use crate::ui::{print_forging, verbose_command, verbose_command_hard};
 use anyhow::{bail, Result};
 use crate::compile::get_compiler_cmd;
-use crate::fs_utils::{create_forge_sub_dir, normalize_path, find_o_files};
+use crate::fs_utils::{create_forge_sub_dir, normalize_path, find_o_files, find_o_files_dir};
+
 
 #[allow(unused_imports)] // is imported for linux and macOS
 use crate::fs_utils::{find_file, find_r_paths};
@@ -101,15 +102,8 @@ pub fn archive_static_library(cfg: &Config) -> Result<()>{
     let mut cmd = Command::new("ar");
     cmd.arg("rcs").arg(&name);
     
-    let o_path = {
-        if cfg.args.debug {
-            Path::new("forge/debug")
-        }
-        else {
-            Path::new("forge/release")
-        }
-    };
-    let o_files = find_o_files(o_path);
+    let o_path = find_o_files_dir(&cfg); 
+    let o_files = find_o_files(&o_path);
     for o_file in &o_files {
         // add the normalized path
         cmd.arg(normalize_path(o_file));
@@ -143,26 +137,13 @@ pub fn link_executable(config: &Config) -> Result<()> {
     };
     
     
-    let o_path = {
-        if config.args.debug {
-            Path::new("forge/debug")
-        }
-        else {
-            Path::new("forge/release")
-        }
-    };
-    let o_files = find_o_files(o_path);
+    let o_path = find_o_files_dir(&config);
+    let o_files = find_o_files(&o_path);
     
     print_forging(&target_executable);
     let cwd = std::env::current_dir().expect("Failed to get current directory");
     
-    let target_path;
-    if config.args.debug {
-        target_path = cwd.join("forge").join("debug").join(target_executable);
-    }
-    else {
-        target_path = cwd.join("forge").join("release").join(target_executable);
-    }
+    let target_path= cwd.join(find_o_files_dir(&config).join(target_executable.clone()));
     
     let mut cmd= match get_compiler_cmd(&config) {
         Ok(cmd) => cmd,

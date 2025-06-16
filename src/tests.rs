@@ -1,6 +1,6 @@
 use std::path::{Path};
-use crate::arguments::Command::Clean;
-use crate::arguments::ForgeArgs;
+use crate::arguments::Command::{Clean, Rebuild};
+use crate::arguments::{BuildOptions, CleanOptions, ForgeArgs};
 use crate::config::{Build, CompilerKind, Config, Forge, Project};
 
 // usage is not recognized by rustfmt
@@ -9,12 +9,9 @@ pub fn dummy_config(debug: bool) -> Config {
     Config {
         compiler: CompilerKind::GCC,
         args: ForgeArgs {
-            compiler: Some("gcc".to_string()),
-            debug,
-            release: !debug,
             verbose: false,
             verbose_hard: false,
-            command: Clean,
+            command: Rebuild(BuildOptions {debug, compiler: None, release: !debug}),
         },
         forge: Forge {
             build: Build {

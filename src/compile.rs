@@ -59,12 +59,7 @@ pub fn compile_unix_like(config: &Config, shared: bool) -> Result<(), String>{
         }
         
         // add target specific compiler flags
-        if config.args.debug {
-            add_debug_cflags(&mut cmd);
-        }
-        else if config.args.release {
-            add_release_cflags(&mut cmd);
-        }
+        add_build_flags(&config.args.command, &mut cmd);
         // if we are compiling a shared library, add the extra flags
         if shared {
             cmd.arg("-fPIC");
@@ -140,7 +135,7 @@ pub fn get_files_to_compile(config: &Config, shared: bool)
         let mut compile = false;
         // if command ist rebuild, compile all files
         match &config.args.command {
-            Rebuild => compile = true,
+            Rebuild(_) => compile = true,
             Run(options) => {
                 if options.clean {
                     compile = true;
@@ -218,7 +213,7 @@ fn parse_h_dependencies(relpath: &Path, config: &Config) -> Result<Vec<PathBuf>,
     let output = gcc_clang_mm(relpath, config)?;
     let parts: Vec<&str> = output.split(':').collect();
     if parts.len() != 2 {
-        return Err(format!("Could not parse gcc output: {}", output).to_string());
+        return Err(format!("Could not parse gcc/clang output: {}", output).to_string());
     }
     
     let deps_str = parts[1];

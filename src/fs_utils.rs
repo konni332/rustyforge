@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::config::{Build, Config, Forge, Project};
 use crate::hashes::HashCache;
 use anyhow::{Result, bail};
+use crate::arguments::{InitOptions, Command::*, Command};
 
 pub fn create_forge_dir() -> Result<()> {
     let dir_path = Path::new("forge");
@@ -39,13 +40,36 @@ pub fn get_equivalent_forge_path(input_path: &Path, config: &Config, shared: boo
     
     let forge_path: PathBuf;
     if shared { 
-        forge_path = cwd.join("forge").join("libs").join("obj").join(format!("{}.o", file_stem));
+        forge_path = cwd.join("forge").join("libs").join("obj")
+            .join(format!("{}.o", file_stem));
     }
-    else if config.args.debug {
-        forge_path = cwd.join("forge").join("debug").join(format!("{}.o", file_stem));
-    }
-    else {
-        forge_path = cwd.join("forge").join("release").join(format!("{}.o", file_stem));
+    else { 
+        forge_path = match &config.args.command { 
+            Run(opt) => {
+                let build_type = match opt.release {
+                    true => "release",
+                    false => "debug",
+                };
+                cwd.join("forge").join(build_type).join(format!("{}.o", file_stem))
+            }
+            Build(opt) => {
+                let build_type = match opt.release { 
+                    true => "release",
+                    false => "debug",
+                };
+                cwd.join("forge").join(build_type).join(format!("{}.o", file_stem))
+            }
+            Rebuild(opt) => {
+                let build_type = match opt.release { 
+                    true => "release",
+                    false => "debug",
+                };
+                cwd.join("forge").join(build_type).join(format!("{}.o", file_stem))
+            }
+            _ => {
+                Err("Invalid command")?
+            }
+        }
     }
     Ok(forge_path)
 }
@@ -144,21 +168,26 @@ pub fn save_hash_cache_json(entries: &Vec<HashCache>, json_path: PathBuf) -> Res
     fs::write(json_path, data)?;
     Ok(())
 }
-pub fn init_default_toml() -> Result<()> {
+pub fn init_default_toml(opt: &InitOptions) -> Result<()> {
     let cwd = std::env::current_dir()?;
 
     let dir_name = cwd
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("unknown");
-
+    
+    let compiler = match &opt.compiler {
+        Some(c) => c,
+        None => &"gcc".to_string(),
+    };
+    
     let default = Forge {
         project: Project {
             name: dir_name.to_string(),
             targets: vec!["bin".to_string()],
         },
         build: Build {
-            compiler: Some("gcc".to_string()),
+            compiler: Some(compiler.to_string()),
             src: vec![],
             include_dirs: vec![],
             output: dir_name.to_string(),
@@ -209,12 +238,12 @@ pub fn ensure_necessary_files() -> Result<()> {
     Ok(())
 }
 
-pub fn init_forge_structure() -> Result<()> {
+pub fn init_forge_structure(opt: &InitOptions) -> Result<()> {
     // create forge files
     create_forge_dir()?;
     create_forge_sub_dir(".forge")?;
     init_hash_cache_json(std_hash_cache_path()?)?;
-    init_default_toml()?;
+    init_default_toml(&opt)?;
     // create the default project structure
     fs::create_dir_all("src")?;
     fs::create_dir_all("include")?;
@@ -264,6 +293,70 @@ pub fn find_o_files(rel_path: &Path) -> Vec<PathBuf>{
     }
     o_files
 }
+
+pub fn find_o_files_dir(cfg: &Config) -> PathBuf {
+    match &cfg.args.command {
+        Run(opt) => {
+            if opt.debug {
+                PathBuf::from("forge/debug")
+            }
+            else {
+                PathBuf::from("forge/release")
+            }
+        }
+        Build(opt) => {
+            if opt.debug {
+                PathBuf::from("forge/debug")
+            }
+            else {
+                PathBuf::from("forge/release")
+            }
+        }
+        Rebuild(opt) => {
+            if opt.debug {
+                PathBuf::from("forge/debug")
+            }
+            else {
+                PathBuf::from("forge/release")
+            }
+        }
+        _ => {
+            PathBuf::from("forge/debug")
+        }
+    }
+}
+
+pub fn create_build_dir(cmd: &Command) -> Result<()> {
+    match cmd { 
+        Run(opt) => {
+            if opt.debug {
+                create_forge_sub_dir("debug")?;
+            }
+            else {
+                create_forge_sub_dir("release")?;
+            }
+        },
+        Build(opt) => {
+            if opt.debug {
+                create_forge_sub_dir("debug")?;
+            }
+            else {
+                create_forge_sub_dir("release")?;
+            }
+        },
+        Rebuild(opt) => {
+            if opt.debug {
+                create_forge_sub_dir("debug")?;
+            }
+            else {
+                create_forge_sub_dir("release")?;
+            }
+        },
+        _ => {}
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

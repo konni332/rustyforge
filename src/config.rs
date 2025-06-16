@@ -4,6 +4,8 @@ use std::fs;
 use crate::ForgeArgs;
 use crate::fs_utils::std_toml_path;
 use crate::utils::check_compiler;
+use crate::arguments::Command::*;
+use crate::config::CompilerKind::GCC;
 
 pub struct Config {
     pub forge: Forge,
@@ -29,12 +31,23 @@ impl Display for CompilerKind {
 }
 
 fn determine_compiler_kind(forge: &Forge, args: &ForgeArgs) -> CompilerKind {
-    let arg_compiler = &args.compiler;
+    let arg_compiler = match &args.command { 
+        Run(opt) => {
+            opt.compiler.clone()
+        }
+        Build(opt) => {
+            opt.compiler.clone()
+        }
+        Rebuild(opt) => {
+            opt.compiler.clone()
+        }
+        _ => None,
+    };
     let conf_compiler = &forge.build.compiler;
     let kind = match arg_compiler { 
         // prioritize: args > forge
         Some(comp) => {
-            match_compiler_kind(comp)
+            match_compiler_kind(&comp)
         }
         None => {
             match conf_compiler {

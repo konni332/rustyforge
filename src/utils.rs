@@ -2,6 +2,9 @@ use std::path::Path;
 use std::process::Command;
 use crate::config::{CompilerKind, Config};
 use crossterm::style::{Stylize};
+use crate::arguments;
+use crate::arguments::Command::*;
+use crate::arguments::{CleanOptions, BuildOptions};
 
 pub fn check_compiler(cfg: &mut Config) {
     let comp = cfg.compiler;
@@ -121,6 +124,37 @@ pub fn strip_cwd(arg: &str, cwd: &Path) -> String {
     }
 }
 
+// TODO: Change name of subcommands
+pub fn add_build_flags(command: &arguments::Command, cmd: &mut Command) {
+    match command { 
+        Run(opt) => {
+            if opt.debug {
+                add_debug_cflags(cmd);
+            } 
+            else {
+                add_release_cflags(cmd);
+            }
+        }
+        Build(opt) => {
+            if opt.debug {
+                add_debug_cflags(cmd);
+            } 
+            else {
+                add_release_cflags(cmd);
+            }
+        }
+        Rebuild(opt) => {
+            if opt.debug {
+                add_debug_cflags(cmd);
+            } 
+            else {
+                add_release_cflags(cmd);
+            }
+        }
+        _ => {}
+    }
+}
+
 pub fn add_debug_cflags(cmd: &mut Command) {
     cmd.arg("-g").arg("-O0").arg("-Wall").arg("-Wextra").arg("-DDEBUG");
 }
@@ -141,6 +175,15 @@ pub fn format_shared_lib_name(name: &mut String){
     let new_name = format!("lib{}.so", name);
     *name = new_name;
 }
+
+pub fn derive_clean_options(build_opt: &BuildOptions) -> CleanOptions {
+    CleanOptions {
+        debug: build_opt.debug,
+        release: build_opt.release,
+        libs: false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

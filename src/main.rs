@@ -1,15 +1,15 @@
 use std::io::Write;
 use std::path::Path;
 use crate::config::{Config};
-use crate::fs_utils::{create_forge_sub_dir, ensure_necessary_files, init_forge_structure, init_hash_cache_json, std_hash_cache_path, std_toml_path};
-use crate::arguments::ForgeArgs;
+use crate::fs_utils::{create_build_dir, create_forge_sub_dir, ensure_necessary_files, init_forge_structure, init_hash_cache_json, std_hash_cache_path, std_toml_path};
+use crate::arguments::{set_command_defaults, CleanOptions, ForgeArgs, RunOptions};
 use clap::Parser;
 use crate::arguments::Command::{Build, Run, Rebuild, Clean, Init, Discover};
 use crate::compile::compile;
 use crate::discovery::discover;
 use crate::linker::link;
 use crate::ui::{print_cleaning, verbose_command, verbose_command_hard};
-
+use crate::utils::derive_clean_options;
 
 mod config;
 mod fs_utils;
@@ -27,9 +27,7 @@ fn main() {
     let mut args = ForgeArgs::parse();
     
     // set default to debug if no other option is given
-    if !&args.debug && !&args.release {
-        args.debug = true;
-    }
+    set_command_defaults(&mut args.command);
 
     // get the current working directory
     let cwd = match std::env::current_dir() {
@@ -39,8 +37,8 @@ fn main() {
             std::process::exit(1);
         }
     };
-    if args.command == Init {
-        if let Err(e) = init_forge_structure() {
+    if let Init(opt) = &args.command{
+        if let Err(e) = init_forge_structure(opt) {
             eprintln!("Error: {}", e);
             std::process::exit(1);
         }
@@ -63,36 +61,29 @@ fn main() {
         }
     }
     
-    if args.debug {
-        if let Err(e) = create_forge_sub_dir("debug") {
-            eprintln!("Error: {}", e);
-            std::process::exit(1);
-        }
-    }
-    else if args.release {
-        if let Err(e) = create_forge_sub_dir("release") {
-            eprintln!("Error: {}", e);
-            std::process::exit(1);
-        }
+    if let Err(e) = create_build_dir(&args.command) {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);   
     }
     
-    match &args.command {
-        Build => {
+    match args.command.clone() {
+        Build(_) => {
             compile(&config).expect("Error compiling.");
             link(&config).expect("Error linking.");
         }
-        Rebuild => {
-            clean(&config, &cwd);
+        Rebuild(opt) => {
+            let mut clean_opt = derive_clean_options(&opt);
+            clean(&cwd, &mut clean_opt);
             compile(&config).expect("Error compiling.");
             link(&config).expect("Error linking.");
         }
-        Run(_) => {
+        Run(mut opt) => {
             compile(&config).expect("Error compiling.");
             link(&config).expect("Error linking.");
-            execute_target(&config, &cwd);
+            execute_target(&config, &cwd, &mut opt);
         }
-        Clean => {
-            clean(&config, &cwd);
+        Clean(mut opt) => {
+            clean(&cwd, &mut opt);
         }
         Discover(options) => {
             discover(&options, std_toml_path()
@@ -105,7 +96,7 @@ fn main() {
     }
 }
 
-fn execute_target(config: &Config, cwd: &Path) {
+fn execute_target(config: &Config, cwd: &Path, opt: &mut RunOptions) {
     // needs to mutable on windows!
     #[allow(unused_mut)]
     let mut exe_name = config.forge.build.output.clone();
@@ -115,21 +106,16 @@ fn execute_target(config: &Config, cwd: &Path) {
     exe_name.push_str(".exe");
 
     let mut exe_path = cwd.join("forge");
-    if config.args.debug {
+    if opt.debug {
         exe_path.push("debug");
     }
-    else if config.args.release {
+    else if opt.release {
         exe_path.push("release");
     }
     exe_path = exe_path.join(exe_name);
     let mut cmd = std::process::Command::new(exe_path);
     
-    match &config.args.command { 
-        Run(run_options) => {
-            cmd.args(run_options.args.clone());
-        }
-        _ => {}
-    }
+    cmd.args(opt.args.clone());
     
     if config.args.verbose {
         verbose_command(&cmd);
@@ -144,26 +130,32 @@ fn execute_target(config: &Config, cwd: &Path) {
     std::io::stderr().write_all(&output.stderr).expect("Error writing stderr.");
 }
 
-fn clean(config: &Config, cwd: &Path) {
+fn clean(cwd: &Path, opt: &mut CleanOptions) {
     print_cleaning();
-    if config.args.debug {
+    // if none are specified, clean everything
+    if !opt.debug && !opt.release && !opt.libs {
+        opt.debug = true;
+        opt.release = true;
+        opt.libs = true;   
+    }
+    if opt.debug {
         let path = cwd.join("forge").join("debug");
         if path.exists() {
             std::fs::remove_dir_all(path).expect("Error removing debug directory.");
         }
     }
-    else if config.args.release {
+    else if opt.release {
         let path = cwd.join("forge").join("release");
         if path.exists() {
             std::fs::remove_dir_all(path).expect("Error removing release directory.");
         }
     }
-    
-    let libs_path = cwd.join("forge").join("libs");
-    if libs_path.exists() {
-        std::fs::remove_dir_all(libs_path).expect("Error removing libs directory.");
+    else if opt.libs {
+        let libs_path = cwd.join("forge").join("libs");
+        if libs_path.exists() {
+            std::fs::remove_dir_all(libs_path).expect("Error removing libs directory.");
+        }
     }
-    
     let json_path = cwd.join("forge").join(".forge").join("hash_cache.json");
     if json_path.exists()  {
         std::fs::remove_file(json_path).expect("Error removing hash cache file.");
@@ -174,13 +166,18 @@ fn clean(config: &Config, cwd: &Path) {
         std::process::exit(1);
     }
     // reinitialize forge directory
-    if config.args.debug {
+    if opt.debug {
         if let Err(e) = create_forge_sub_dir("debug") {
             eprintln!("Error: {}", e);
         }
     }
-    else if config.args.release {
+    else if opt.release {
         if let Err(e) = create_forge_sub_dir("release") {
+            eprintln!("Error: {}", e);
+        }
+    }
+    else if opt.libs {
+        if let Err(e) = create_forge_sub_dir("libs") {
             eprintln!("Error: {}", e);
         }
     }

@@ -107,6 +107,15 @@ library_paths = ["libs"]
 include_dirs = ["libs/include"]
 posix_libraries = ["m", "pthreads"]
 ```
+---
+
+## Compiler Support
+
+###  ⚠️ Important
+
+Using `clang` on Windows may result in missing Windows-specific headers.  
+We recommend using `gcc` with MinGW for now.  
+Support for MSVC via `cl.exe` and `clang-cl` is planned.  
 
 ---
 ## Build Benchmark 

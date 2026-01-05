@@ -1,10 +1,13 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process::Command};
 
 use anyhow::bail;
 
-use crate::compile::{
-    Compiler, object_path,
-    types::{CannonicalCommand, CannonicalCommandBuilder, Profile},
+use crate::{
+    compile::{
+        Compiler, object_path,
+        types::{CannonicalCommand, CannonicalCommandBuilder, Profile},
+    },
+    ui::output_error_compile,
 };
 
 pub struct Msvc;
@@ -19,6 +22,9 @@ impl Msvc {
 }
 
 impl Compiler for Msvc {
+    fn new() -> Self {
+        Msvc
+    }
     fn compile_cmd(
         &self,
         unit: &super::types::CompileUnit,
@@ -49,15 +55,18 @@ impl Compiler for Msvc {
         Ok(cmd.finish())
     }
     fn get_dependencies(&self, file: &std::path::Path) -> anyhow::Result<Vec<std::path::PathBuf>> {
-        let output = std::process::Command::new("cl.exe")
-            .arg("/nologo")
+        let mut cmd = Command::new("cl.exe");
+        cmd.arg("/nologo")
             .arg("/showIncludes")
             .arg("/c")
             .arg(file)
             .output()?;
 
+        let output = cmd.output()?;
+
         if !output.status.success() {
-            bail!("failed to get dependencies for {}", file.display());
+            output_error_compile(file, &cmd, &output.stderr);
+            bail!("Dependency collection failed");
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);

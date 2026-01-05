@@ -5,10 +5,11 @@ use std::{
     process::Command,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::{Deserialize, Serialize};
 use twox_hash::XxHash64;
+use verbosio::get_verbosity;
 
 use crate::{
     cli::ForgeArgs,
@@ -18,7 +19,7 @@ use crate::{
     },
     config::project::ProjectConfig,
     fs::{build_cache_path, debug_dir, object_dir, release_dir},
-    ui,
+    ui::{self, output_discovered_dir, output_discovered_file},
 };
 
 pub struct CompilerDriver<C: Compiler> {
@@ -37,7 +38,7 @@ impl BuildCache {
     pub fn save_cache(&self) -> Result<()> {
         let bytes = postcard::to_allocvec(&self)?;
         let path = build_cache_path(std::env::current_dir()?);
-        std::fs::write(path, bytes)?;
+        std::fs::write(path, bytes).context("Failed to write cache to disk")?;
         Ok(())
     }
     pub fn load_cache() -> Result<Self> {
@@ -46,8 +47,8 @@ impl BuildCache {
             return Ok(Self::default());
         }
 
-        let bytes = std::fs::read(path)?;
-        let cache: Self = postcard::from_bytes(&bytes)?;
+        let bytes = std::fs::read(path).context("Failed to read cache from disk")?;
+        let cache: Self = postcard::from_bytes(&bytes).context("Failed to deserialize cache")?;
         Ok(cache)
     }
 }
@@ -55,7 +56,6 @@ impl BuildCache {
 impl<C: Compiler> CompilerDriver<C> {
     pub fn default_driver<P: AsRef<Path>>(
         root: P,
-        compiler: C,
         args: &ForgeArgs,
         project_config: &ProjectConfig,
     ) -> Result<Self> {
@@ -65,6 +65,7 @@ impl<C: Compiler> CompilerDriver<C> {
             Profile::Release => release_dir(root),
         };
         let object_dir = object_dir(profile_dir);
+        std::fs::create_dir_all(&object_dir)?;
         let ignore_pattern_strings = &project_config.compilation.ignore_patterns;
         let user_flags = match profile {
             Profile::Debug => project_config
@@ -97,7 +98,7 @@ impl<C: Compiler> CompilerDriver<C> {
 
         let target = args.target();
         Self::new(
-            compiler,
+            C::new(),
             object_dir,
             ignore_pattern_strings,
             profile,
@@ -143,6 +144,9 @@ impl<C: Compiler> CompilerDriver<C> {
             if path.extension().map(|ext| ext == "c").unwrap_or(false)
                 && !self.should_be_ignored(path)
             {
+                if get_verbosity!() > 0 {
+                    output_discovered_file(path);
+                }
                 files.push(path.to_path_buf());
             }
         }
@@ -158,8 +162,10 @@ impl<C: Compiler> CompilerDriver<C> {
             let path = entry.path();
             if path.extension().map(|e| e == "h").unwrap_or(false)
                 && let Some(parent) = path.parent()
+                && dirs.insert(parent.to_path_buf(), ()).is_some()
+                && get_verbosity!() > 0
             {
-                dirs.insert(parent.to_path_buf(), ());
+                output_discovered_dir(parent);
             }
         }
 
@@ -178,17 +184,20 @@ impl<C: Compiler> CompilerDriver<C> {
 
         cmd.hash(&mut hasher);
 
-        let content = std::fs::read(source)?;
+        let content = std::fs::read(source).context("Failed to read file contents")?;
         content.hash(&mut hasher);
 
         for dep in deps {
-            let dep_content = std::fs::read(dep)?;
+            let dep_content = std::fs::read(dep).context(format!(
+                "Failed to read dependency content from: {}",
+                dep.display()
+            ))?;
             dep_content.hash(&mut hasher);
         }
 
         Ok(hasher.finish())
     }
-    pub fn resolve_incremental(&mut self) -> Result<Vec<(PathBuf, std::process::Command)>> {
+    pub fn resolve_incremental(&mut self) -> Result<Vec<(PathBuf, u64, std::process::Command)>> {
         let mut files = self.discover_files()?;
         files.sort();
         let mut includes = self.discover_include_dirs()?;
@@ -213,8 +222,7 @@ impl<C: Compiler> CompilerDriver<C> {
                 continue;
             }
 
-            cmds.push((file.to_path_buf(), Command::from(&cmd)));
-            self.cache.map.insert(hash, file.clone());
+            cmds.push((file.to_path_buf(), hash, Command::from(&cmd)));
         }
 
         Ok(cmds)
@@ -223,12 +231,13 @@ impl<C: Compiler> CompilerDriver<C> {
     pub fn compile_incremental(&mut self) -> Result<()> {
         let mut failed = false;
         let cmds = self.resolve_incremental()?;
-        for (path, mut cmd) in cmds {
+        for (path, hash, mut cmd) in cmds {
             let output = cmd.output()?;
             if output.status.success() {
-                ui::output_successfull_compile(&path);
+                ui::output_successfull_compile(&path, &cmd);
+                self.cache.map.insert(hash, path.clone());
             } else {
-                ui::output_error_compile(&path, &output.stderr);
+                ui::output_error_compile(&path, &cmd, &output.stderr);
                 failed = true;
             }
         }

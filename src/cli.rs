@@ -28,40 +28,34 @@ pub struct ForgeArgs {
 #[derive(Subcommand, Debug, PartialEq, Clone)]
 pub enum Command {
     /// Compile and link a C project
-    Build(BuildOptions),
+    Build {
+        #[command(flatten)]
+        opts: ForgeOptions,
+    },
     /// Clean the project all build artifacts, unless otherwise specified
-    Clean(CleanOptions),
+    Clean,
     /// Build and run the project
-    Run(RunOptions),
+    Run {
+        #[command(flatten)]
+        opts: ForgeOptions,
+        #[arg(value_name = "ARGS", trailing_var_arg = true)]
+        args: Vec<String>,
+    },
     /// Rebuild the project
-    Rebuild(BuildOptions),
+    Rebuild {
+        #[command(flatten)]
+        opts: ForgeOptions,
+    },
     /// Initialize a new project in current directory
     Init,
     /// Create a new project in a new directory
     New { project_name: String },
+    /// Remove all files related to RustyForge in the current directory
+    Remove,
 }
 
 #[derive(Args, Debug, PartialEq, Clone)]
-pub struct RunOptions {
-    /// Run the project in debug mode
-    #[arg(long, conflicts_with = "release")]
-    pub debug: bool,
-    /// Run the project in release mode
-    #[arg(long, conflicts_with = "debug")]
-    pub release: bool,
-    /// Clean the project before running
-    #[arg(long)]
-    pub clean: bool,
-    /// Arguments to pass to the program
-    #[arg(value_name = "ARGS", trailing_var_arg = true)]
-    pub args: Vec<String>,
-    /// cross compile for a different target
-    #[arg(long)]
-    pub target: Option<String>,
-}
-
-#[derive(Args, Debug, PartialEq, Clone)]
-pub struct BuildOptions {
+pub struct ForgeOptions {
     /// specify the build profile as debug (default)
     #[arg(long, conflicts_with = "release")]
     pub debug: bool,
@@ -73,32 +67,7 @@ pub struct BuildOptions {
     pub target: Option<String>,
 }
 
-#[derive(Args, Debug, PartialEq, Clone)]
-pub struct CleanOptions {
-    /// clean the debug artifacts only
-    #[arg(long)]
-    pub debug: bool,
-    /// clean the release artifacts only
-    #[arg(long)]
-    pub release: bool,
-}
-
-impl RunOptions {
-    pub fn profile(&self) -> Option<Profile> {
-        if self.release {
-            Some(Profile::Release)
-        } else if self.debug {
-            Some(Profile::Debug)
-        } else {
-            None
-        }
-    }
-    pub fn target(&self) -> Option<&String> {
-        self.target.as_ref()
-    }
-}
-
-impl BuildOptions {
+impl ForgeOptions {
     pub fn profile(&self) -> Option<Profile> {
         if self.release {
             Some(Profile::Release)
@@ -116,17 +85,17 @@ impl BuildOptions {
 impl ForgeArgs {
     pub fn profile(&self) -> Option<Profile> {
         match &self.command {
-            Command::Run(opts) => opts.profile(),
-            Command::Build(opts) => opts.profile(),
-            Command::Rebuild(opts) => opts.profile(),
+            Command::Build { opts } => opts.profile(),
+            Command::Rebuild { opts } => opts.profile(),
+            Command::Run { opts, .. } => opts.profile(),
             _ => None,
         }
     }
     pub fn target(&self) -> Option<&String> {
         match &self.command {
-            Command::Run(opts) => opts.target(),
-            Command::Build(opts) => opts.target(),
-            Command::Rebuild(opts) => opts.target(),
+            Command::Build { opts } => opts.target.as_ref(),
+            Command::Rebuild { opts } => opts.target.as_ref(),
+            Command::Run { opts, .. } => opts.target.as_ref(),
             _ => None,
         }
     }

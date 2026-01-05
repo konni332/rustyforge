@@ -1,12 +1,9 @@
-# Rust typische Ignores
 /target/
 /**/*.rs.bk
 **/*.rs.bk
 
-# Cargo Lockfile (manche Teams ignorieren es, manche nicht)
 /Cargo.lock
 
-# Editor- und OS-Dateien
 *.swp
 *.swo
 .DS_Store
@@ -14,6 +11,6 @@
 .vscode/
 *.log
 
-# Test C Projekt ignorieren
 /test-c-project/
+**/sds/**
 

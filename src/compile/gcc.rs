@@ -1,10 +1,13 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process::Command};
 
 use anyhow::bail;
 
-use crate::compile::{
-    Compiler, object_path,
-    types::{CannonicalCommand, CannonicalCommandBuilder, Profile},
+use crate::{
+    compile::{
+        Compiler, object_path,
+        types::{CannonicalCommand, CannonicalCommandBuilder, Profile},
+    },
+    ui::output_error_compile,
 };
 
 pub struct Gcc;
@@ -19,6 +22,9 @@ impl Gcc {
 }
 
 impl Compiler for Gcc {
+    fn new() -> Self {
+        Gcc
+    }
     fn compile_cmd(
         &self,
         unit: &super::types::CompileUnit,
@@ -51,21 +57,20 @@ impl Compiler for Gcc {
     fn get_dependencies(&self, file: &std::path::Path) -> anyhow::Result<Vec<std::path::PathBuf>> {
         let tmp_d = tempfile::NamedTempFile::new()?.into_temp_path();
 
-        let status = std::process::Command::new("gcc")
-            .arg("-MMD")
-            .arg("-MF")
-            .arg(&tmp_d)
-            .arg(file)
-            .status()?;
+        let mut cmd = Command::new("clang");
+        cmd.arg("-MM").arg("-MP").arg("-MF").arg(&tmp_d).arg(file);
 
-        if !status.success() {
-            bail!("failed to generate dependency file for {}", file.display());
+        let output = cmd.output()?;
+
+        if !output.status.success() {
+            output_error_compile(file, &cmd, &output.stderr);
+            bail!("Dependency collection failed");
         }
 
         let content = std::fs::read_to_string(&tmp_d)?;
         let mut deps = Vec::new();
         for part in content.split_whitespace().skip(1) {
-            let path = PathBuf::from(part.trim_end_matches('\\'));
+            let path = PathBuf::from(part.trim_end_matches('\\').trim_end_matches(':'));
             deps.push(path);
         }
 

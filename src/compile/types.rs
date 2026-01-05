@@ -77,8 +77,7 @@ impl CannonicalCommandBuilder {
     }
     pub fn finish(self) -> CannonicalCommand {
         let program = self.program;
-        let mut args = self.args;
-        args.sort();
+        let args = self.args;
         let mut envs = self.envs;
         envs.sort();
         let cwd = self.cwd;

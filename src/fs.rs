@@ -2,9 +2,13 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 
-use crate::config::project::ProjectConfig;
+use crate::{
+    compile::types::Profile,
+    config::{project::ProjectConfig, tool::ToolConfig},
+    ui,
+};
 
-pub fn initialize_filestructure() -> Result<()> {
+pub fn initialize_filestructure(project_name: Option<&str>) -> Result<()> {
     let global_config_dir = global_config_dir()?;
     std::fs::create_dir_all(&global_config_dir).context(format!(
         "Failed to create global config dir at: {}",
@@ -14,13 +18,62 @@ pub fn initialize_filestructure() -> Result<()> {
     let cwd = std::env::current_dir().context("Failed to determine current working directory")?;
     let toml_path = toml_path(&cwd);
     if !toml_path.exists() {
-        let project_name = cwd
-            .file_name()
-            .and_then(|f| f.to_str())
-            .unwrap_or("project-name");
+        let project_name = match project_name {
+            Some(n) => n,
+            None => {
+                ui::output_no_rustyforge_initialized();
+                return Ok(());
+            }
+        };
         let project_config = ProjectConfig::new(project_name);
         let project_config_str = toml::to_string_pretty(&project_config)?;
         std::fs::write(toml_path, project_config_str)?;
+    }
+    let config_dir = config_dir(&cwd);
+    std::fs::create_dir_all(&config_dir)?;
+    let config_path = config_path(&cwd);
+    if !config_path.exists() {
+        let config = ToolConfig::default();
+        let config_str = toml::to_string_pretty(&config)?;
+        std::fs::write(&config_path, config_str)?;
+    }
+    Ok(())
+}
+
+pub fn create_profile_dir(profile: Profile) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    match profile {
+        Profile::Debug => {
+            let debug_dir = debug_dir(cwd);
+            std::fs::create_dir_all(debug_dir)?;
+        }
+        Profile::Release => {
+            let release_dir = release_dir(cwd);
+            std::fs::create_dir_all(release_dir)?;
+        }
+    }
+    Ok(())
+}
+
+pub fn remove_file_structure() -> Result<()> {
+    let cwd = std::env::current_dir().context("Failed to determine current working directory")?;
+    let toml_path = toml_path(&cwd);
+    if toml_path.exists() {
+        std::fs::remove_file(toml_path)?;
+    }
+    let config_dir = config_dir(&cwd);
+    if config_dir.exists() {
+        std::fs::remove_dir_all(config_dir)?;
+    }
+    remove_target_dir()?;
+    Ok(())
+}
+
+pub fn remove_target_dir() -> Result<()> {
+    let cwd = std::env::current_dir().context("Failed to determine current working directory")?;
+    let target_dir = target_dir(cwd);
+    if target_dir.exists() {
+        std::fs::remove_dir_all(target_dir)?;
     }
     Ok(())
 }
@@ -31,6 +84,10 @@ pub fn toml_path<P: AsRef<Path>>(root: P) -> PathBuf {
 
 pub fn config_dir<P: AsRef<Path>>(root: P) -> PathBuf {
     root.as_ref().join(".rustyforge/")
+}
+
+pub fn config_path<P: AsRef<Path>>(root: P) -> PathBuf {
+    config_dir(root).join("config.toml")
 }
 
 pub fn global_config_dir() -> Result<PathBuf> {
@@ -56,5 +113,39 @@ pub fn object_dir<P: AsRef<Path>>(profile_dir: P) -> PathBuf {
 }
 
 pub fn build_cache_path<P: AsRef<Path>>(root: P) -> PathBuf {
-    root.as_ref().join("build.cache")
+    target_dir(root).join("build.cache")
+}
+
+pub fn load_tool_config() -> Result<ToolConfig> {
+    let cwd = std::env::current_dir()?;
+    let config_path = config_path(&cwd);
+
+    let config_str = std::fs::read_to_string(config_path).context("No config.toml found")?;
+    let config = toml::from_str(&config_str)?;
+    Ok(config)
+}
+
+pub fn write_tool_config(config: &ToolConfig) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    let config_str = toml::to_string_pretty(config)?;
+    let config_path = config_path(cwd);
+    std::fs::write(config_path, config_str)?;
+    Ok(())
+}
+
+pub fn load_project_config() -> Result<ProjectConfig> {
+    let cwd = std::env::current_dir()?;
+    let config_path = toml_path(&cwd);
+
+    let config_str = std::fs::read_to_string(config_path).context("No config.toml found")?;
+    let config = toml::from_str(&config_str)?;
+    Ok(config)
+}
+
+pub fn write_project_config(config: &ProjectConfig) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    let config_str = toml::to_string_pretty(config)?;
+    let config_path = toml_path(cwd);
+    std::fs::write(config_path, config_str)?;
+    Ok(())
 }

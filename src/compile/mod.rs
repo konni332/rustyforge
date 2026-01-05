@@ -10,6 +10,11 @@ mod gcc;
 mod msvc;
 pub mod types;
 
+pub use clang::Clang;
+pub use driver::CompilerDriver;
+pub use gcc::Gcc;
+pub use msvc::Msvc;
+
 pub trait Compiler {
     fn compile_cmd(&self, unit: &CompileUnit, opts: &CompileOptions) -> Result<CannonicalCommand>;
     fn compile_batch_cmd(
@@ -25,6 +30,7 @@ pub trait Compiler {
     }
     fn get_dependencies(&self, file: &Path) -> Result<Vec<PathBuf>>;
     fn id(&self) -> &'static str;
+    fn new() -> Self;
 }
 
 fn object_path(object_dir: &Path, source: &Path) -> Result<PathBuf> {

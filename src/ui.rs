@@ -1,5 +1,6 @@
 use colored::Colorize;
 use std::{path::Path, process::Command};
+use verbosio::get_verbosity;
 
 use crate::config::project::LinkTargetKind;
 
@@ -202,7 +203,7 @@ pub fn output_run_exit_signal() {
     #[cfg(feature = "term-colors")]
     println!("{} with signal", "Exited".bold().red());
     #[cfg(not(feature = "term-colors"))]
-    println!("Exited with signale");
+    println!("Exited with signal");
 }
 
 fn shell_escape(s: &std::ffi::OsStr) -> String {
@@ -224,4 +225,15 @@ pub fn display_command(cmd: &Command) -> String {
         .join(" ");
 
     format!("{program} {args}")
+}
+
+pub fn output_running_prebuild_command(cmd: &Command) {
+    #[cfg(feature = "term-colors")]
+    println!("{} prebuild command:", "Running".bold().green());
+    #[cfg(not(feature = "term-colors"))]
+    println!("Running prebuild command:");
+
+    if get_verbosity!() > 0 {
+        println!("  {}", display_command(cmd));
+    }
 }

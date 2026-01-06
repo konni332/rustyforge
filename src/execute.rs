@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::{
     ForgeArgs,
@@ -81,6 +81,13 @@ fn execute_build(
     project_config: &ProjectConfig,
     tool_config: &ToolConfig,
 ) -> Result<Option<PathBuf>> {
+    run_prebuild_commands(
+        project_config
+            .build
+            .pre_build_commands
+            .as_ref()
+            .unwrap_or(&vec![]),
+    )?;
     let project_config_compiler = match opts.profile().unwrap_or(Profile::Debug) {
         Profile::Debug => project_config
             .project
@@ -127,6 +134,23 @@ fn execute_build(
     };
 
     Ok(executable_path)
+}
+
+fn run_prebuild_commands(cmds: &[String]) -> Result<()> {
+    for cmd in cmds {
+        let parts: Vec<_> = cmd.split_whitespace().collect();
+        let exe = parts
+            .first()
+            .context(format!("Failed to get executable from: {}", cmd))?;
+        let args = &parts[1..];
+
+        let status = std::process::Command::new(exe).args(args).status()?;
+
+        if !status.success() {
+            bail!("Pre-Build command failed: {}", cmd);
+        }
+    }
+    Ok(())
 }
 
 fn execute_run(

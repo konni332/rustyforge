@@ -96,6 +96,7 @@ impl Build {
         Self {
             ignore_patterns: vec![],
             link_targets: None,
+            pre_build_commands: None,
         }
     }
 }

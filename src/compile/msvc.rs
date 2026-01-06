@@ -7,7 +7,7 @@ use crate::{
         Compiler, object_path,
         types::{CannonicalCommand, CannonicalCommandBuilder, Profile},
     },
-    ui::output_error_compile,
+    ui::error_compile_msg,
 };
 
 pub struct Msvc;
@@ -76,7 +76,7 @@ impl Compiler for Msvc {
         let output = cmd.output()?;
 
         if !output.status.success() {
-            output_error_compile(unit.source, &cmd, &output.stderr);
+            error_compile_msg(unit.source, &cmd, &output.stderr);
             bail!("Dependency collection failed");
         }
 

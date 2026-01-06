@@ -8,6 +8,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use globset::{Glob, GlobSet, GlobSetBuilder};
+use indicatif::{ProgressBar, ProgressStyle};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use twox_hash::XxHash64;
@@ -21,7 +22,7 @@ use crate::{
     },
     config::project::ProjectConfig,
     fs::{build_cache_path, debug_dir, object_dir, release_dir},
-    ui::{self, output_discovered_dir, output_discovered_file},
+    ui::{self, discovered_dir_msg, discovered_file_msg},
 };
 
 pub struct CompilerDriver<C: Compiler + Sync> {
@@ -144,7 +145,7 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
                 && !self.should_be_ignored(&path)
             {
                 if get_verbosity!() > 0 {
-                    output_discovered_file(&path);
+                    discovered_file_msg(&path);
                 }
                 files.push(path.to_path_buf());
             }
@@ -163,7 +164,7 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
                         break;
                     }
                     if get_verbosity!() > 0 {
-                        output_discovered_dir(parent);
+                        discovered_dir_msg(parent);
                     }
                     current = parent.parent();
                 }
@@ -243,29 +244,47 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
         let cmds = self.resolve_incremental()?;
         let failed = AtomicBool::new(false);
 
-        // Threads sammeln erfolgreiche Updates lokal
+        let pb = ProgressBar::new(cmds.len() as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "{spinner:.green} [{elapsed_precise}] [{bar:40}] {pos}/{len} ({eta}) {msg}",
+                )
+                .context("Failed to create progressbar")?
+                .progress_chars("#>-"),
+        );
+
         let updates: Vec<(u64, PathBuf)> = cmds
             .into_par_iter()
             .filter_map(|(path, hash, mut cmd)| {
                 let output = match cmd.output() {
                     Ok(o) => o,
                     Err(e) => {
-                        ui::output_error_compile(&path, &cmd, format!("{}", e).as_bytes());
+                        let msg = ui::error_compile_msg(&path, &cmd, format!("{}", e).as_bytes());
+                        pb.println(msg);
                         failed.store(true, Ordering::Relaxed);
+                        pb.inc(1);
                         return None;
                     }
                 };
 
                 if output.status.success() {
-                    ui::output_successfull_compile(&path, &cmd);
+                    let msg = ui::successfull_compile_msg(&path, &cmd);
+                    pb.println(msg);
+                    pb.inc(1);
                     Some((hash, path))
                 } else {
-                    ui::output_error_compile(&path, &cmd, &output.stderr);
+                    let msg = ui::error_compile_msg(&path, &cmd, &output.stderr);
+                    pb.println(msg);
                     failed.store(true, Ordering::Relaxed);
+                    pb.inc(1);
                     None
                 }
             })
             .collect();
+
+        pb.finish_and_clear();
+        println!("{}", ui::finished_compilation_msg(pb.elapsed()));
 
         for (hash, path) in updates {
             self.cache.map.insert(hash, path);

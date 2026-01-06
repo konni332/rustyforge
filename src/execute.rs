@@ -59,19 +59,19 @@ fn execute_init() -> Result<()> {
         .unwrap_or("new-project".to_string());
 
     initialize_filestructure(Some(&project_name))?;
-    ui::output_rustyforge_initialized();
+    println!("{}", ui::rustyforge_initialized_msg());
     Ok(())
 }
 
 fn execute_new(name: &str) -> Result<()> {
     initialize_filestructure(Some(name))?;
-    ui::output_rustyforge_new(name);
+    println!("{}", ui::rustyforge_new_msg(name));
     Ok(())
 }
 
 fn execute_remove() -> Result<()> {
     remove_file_structure()?;
-    ui::output_rustyforge_removed();
+    println!("{}", ui::rustyforge_removed_msg());
     Ok(())
 }
 
@@ -145,12 +145,12 @@ fn run_prebuild_commands(cmds: &[String]) -> Result<()> {
         let args = &parts[1..];
         let mut c = std::process::Command::new(exe);
         c.args(args);
-        ui::output_running_prebuild_command(&c);
+        println!("{}", ui::running_prebuild_command_msg(&c));
         let status = c.status().context("Failed to execute pre-build command")?;
 
         match status.code() {
-            Some(code) => ui::output_run_exit_code(code),
-            None => ui::output_run_exit_signal(),
+            Some(code) => println!("{}", ui::run_exit_code_msg(code)),
+            None => println!("{}", ui::run_exit_signal_msg()),
         }
     }
     Ok(())
@@ -168,8 +168,8 @@ fn execute_run(
     let mut cmd = std::process::Command::new(exe_path);
     let status = cmd.args(program_args).status()?;
     match status.code() {
-        Some(code) => ui::output_run_exit_code(code),
-        None => ui::output_run_exit_signal(),
+        Some(code) => println!("{}", ui::run_exit_code_msg(code)),
+        None => println!("{}", ui::run_exit_signal_msg()),
     }
     Ok(())
 }
@@ -187,6 +187,6 @@ fn execute_rebuild(
 
 fn execute_clean() -> Result<()> {
     remove_target_dir()?;
-    ui::output_rustyforge_cleaned();
+    println!("{}", ui::rustyforge_cleaned_msg());
     Ok(())
 }

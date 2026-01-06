@@ -1,10 +1,10 @@
 use colored::Colorize;
-use std::{path::Path, process::Command};
+use std::{path::Path, process::Command, time::Duration};
 use verbosio::get_verbosity;
 
-use crate::config::project::LinkTargetKind;
+use crate::{config::project::LinkTargetKind, utils::format_duration};
 
-pub fn output_successfull_compile(file_path: &Path, cmd: &Command) {
+pub fn successfull_compile_msg(file_path: &Path, cmd: &Command) -> String {
     let verbosity = verbosio::get_verbosity!();
     let path = if verbosity > 1 {
         file_path.to_string_lossy()
@@ -20,7 +20,7 @@ pub fn output_successfull_compile(file_path: &Path, cmd: &Command) {
         if verbosity > 0 {
             msg.push_str(&format!(": {}", display_command(cmd)));
         }
-        println!("{}", msg);
+        msg
     }
     #[cfg(not(feature = "term-colors"))]
     {
@@ -28,11 +28,11 @@ pub fn output_successfull_compile(file_path: &Path, cmd: &Command) {
         if verbosity > 0 {
             msg.push_str(&format!(": {}", display_command(cmd)));
         }
-        println!("{}", msg);
+        msg
     }
 }
 
-pub fn output_error_compile(file_path: &Path, cmd: &Command, error: &[u8]) {
+pub fn error_compile_msg(file_path: &Path, cmd: &Command, error: &[u8]) -> String {
     let err_msg = String::from_utf8_lossy(error);
     let verbosity = verbosio::get_verbosity!();
     let path = if verbosity > 1 {
@@ -50,7 +50,7 @@ pub fn output_error_compile(file_path: &Path, cmd: &Command, error: &[u8]) {
         if verbosity > 0 {
             msg.push_str(&format!(": {}", display_command(cmd)));
         }
-        eprintln!("{}", msg);
+        msg
     }
     #[cfg(not(feature = "term-colors"))]
     {
@@ -58,11 +58,11 @@ pub fn output_error_compile(file_path: &Path, cmd: &Command, error: &[u8]) {
         if verbosity > 0 {
             msg.push_str(&format!(": {}", display_command(cmd)));
         }
-        eprintln!("{}", msg);
+        msg
     }
 }
 
-pub fn output_successfull_link(cmd: &Command, link_target_kind: LinkTargetKind) {
+pub fn successfull_link_msg(cmd: &Command, link_target_kind: LinkTargetKind) -> String {
     #[cfg(feature = "term-colors")]
     {
         use verbosio::get_verbosity;
@@ -71,7 +71,7 @@ pub fn output_successfull_link(cmd: &Command, link_target_kind: LinkTargetKind) 
         if get_verbosity!() > 0 {
             msg.push_str(&format!(": {}", display_command(cmd)));
         }
-        println!("{}", msg);
+        msg
     }
     #[cfg(not(feature = "term-colors"))]
     {
@@ -81,11 +81,15 @@ pub fn output_successfull_link(cmd: &Command, link_target_kind: LinkTargetKind) 
         if get_verbosity!() > 0 {
             msg.push_str(&format!(": {}", display_command(cmd)));
         }
-        println!("{}", msg);
+        msg
     }
 }
 
-pub fn output_error_link(cmd: Option<&Command>, error: &[u8], link_target_kind: LinkTargetKind) {
+pub fn error_link_msg(
+    cmd: Option<&Command>,
+    error: &[u8],
+    link_target_kind: LinkTargetKind,
+) -> String {
     let err_msg = String::from_utf8_lossy(error);
 
     #[cfg(feature = "term-colors")]
@@ -103,7 +107,7 @@ pub fn output_error_link(cmd: Option<&Command>, error: &[u8], link_target_kind: 
         {
             msg.push_str(&format!(": {}", display_command(c)));
         }
-        eprintln!("{}", msg);
+        msg
     }
     #[cfg(not(feature = "term-colors"))]
     {
@@ -113,78 +117,78 @@ pub fn output_error_link(cmd: Option<&Command>, error: &[u8], link_target_kind: 
         {
             msg.push_str(&format!(": {}", display_command(c)));
         }
-        eprintln!("{}", msg);
+        msg
     }
 }
 
-pub fn output_no_rustyforge_initialized() {
+pub fn no_rustyforge_initialized_msg() -> String {
     #[cfg(feature = "term-colors")]
-    println!(
+    return format!(
         "{}: no rustyforge project found\n   {}: 'rustyforge init' to create a new project in this directory",
         "Error".bold().red(),
         "try".bold().cyan()
     );
     #[cfg(not(feature = "term-colors"))]
-    println!(
+    return format!(
         "Error: no rustyforge project found\n   try: 'rustyforge init' to create a new project in this directory",
     );
 }
 
-pub fn output_rustyforge_initialized() {
+pub fn rustyforge_initialized_msg() -> String {
     #[cfg(feature = "term-colors")]
-    println!("{} new rustyforge project", "Initialized".bold().green());
+    return format!("{} new rustyforge project", "Initialized".bold().green());
     #[cfg(not(feature = "term-colors"))]
-    println!("Initialized new rustyforge project");
+    return format!("Initialized new rustyforge project");
 }
 
-pub fn output_rustyforge_new(name: &str) {
+pub fn rustyforge_new_msg(name: &str) -> String {
     #[cfg(feature = "term-colors")]
-    println!(
+    return format!(
         "{} new rustyforge project in: {}",
         "Initialized".bold().green(),
         name
     );
     #[cfg(not(feature = "term-colors"))]
-    println!("Initialized new rustyforge project in: {}", name);
+    return format!("Initialized new rustyforge project in: {}", name);
 }
 
-pub fn output_rustyforge_removed() {
+pub fn rustyforge_removed_msg() -> String {
     #[cfg(feature = "term-colors")]
-    println!("{} rustyforge project", "Removed".bold().red());
+    return format!("{} rustyforge project", "Removed".bold().red());
     #[cfg(not(feature = "term-colors"))]
-    println!("Removed rustyforge project");
+    return format!("Removed rustyforge project");
 }
 
-pub fn output_rustyforge_cleaned() {
+pub fn rustyforge_cleaned_msg() -> String {
     #[cfg(feature = "term-colors")]
-    println!("{} rustyforge project", "Cleaned".bold().green());
+    return format!("{} rustyforge project", "Cleaned".bold().green());
     #[cfg(not(feature = "term-colors"))]
-    println!("Cleaned rustyforge project");
+    return format!("Cleaned rustyforge project");
 }
 
-pub fn output_discovered_file<P: AsRef<Path>>(path: P) {
+pub fn discovered_file_msg<P: AsRef<Path>>(path: P) -> String {
     #[cfg(feature = "term-colors")]
-    println!(
+    return format!(
         "{}: {}",
         "Discovered file".bold().green(),
         path.as_ref().display()
     );
     #[cfg(not(feature = "term-colors"))]
-    println!("Discovered file: {}", path.as_ref().display());
+    return format!("Discovered file: {}", path.as_ref().display());
 }
 
-pub fn output_discovered_dir<P: AsRef<Path>>(path: P) {
+pub fn discovered_dir_msg<P: AsRef<Path>>(path: P) -> String {
     #[cfg(feature = "term-colors")]
-    println!(
+    return format!(
         "{}: {}",
         "Discovered dir".bold().green(),
         path.as_ref().display()
     );
     #[cfg(not(feature = "term-colors"))]
-    println!("Discovered dir: {}", path.as_ref().display());
+    return format!("Discovered dir: {}", path.as_ref().display());
 }
 
-pub fn output_run_exit_code(exit_code: i32) {
+pub fn run_exit_code_msg(exit_code: i32) -> String {
     let success = exit_code == 0;
     #[cfg(feature = "term-colors")]
     {
@@ -193,17 +197,17 @@ pub fn output_run_exit_code(exit_code: i32) {
         } else {
             "Exited".bold().red()
         };
-        println!("{} with code: {}", exited, exit_code);
+        format!("{} with code: {}", exited, exit_code)
     }
     #[cfg(not(feature = "term-colors"))]
-    println!("Exited with code: {}", exit_code);
+    return format!("Exited with code: {}", exit_code);
 }
 
-pub fn output_run_exit_signal() {
+pub fn run_exit_signal_msg() -> String {
     #[cfg(feature = "term-colors")]
-    println!("{} with signal", "Exited".bold().red());
+    return format!("{} with signal", "Exited".bold().red());
     #[cfg(not(feature = "term-colors"))]
-    println!("Exited with signal");
+    return format!("Exited with signal");
 }
 
 fn shell_escape(s: &std::ffi::OsStr) -> String {
@@ -227,13 +231,36 @@ pub fn display_command(cmd: &Command) -> String {
     format!("{program} {args}")
 }
 
-pub fn output_running_prebuild_command(cmd: &Command) {
+pub fn running_prebuild_command_msg(cmd: &Command) -> String {
     #[cfg(feature = "term-colors")]
-    println!("{} prebuild command:", "Running".bold().green());
+    let mut msg = format!("{} prebuild command:", "Running".bold().green());
     #[cfg(not(feature = "term-colors"))]
-    println!("Running prebuild command:");
+    let mut msg = format!("Running prebuild command:");
 
     if get_verbosity!() > 0 {
-        println!("  {}", display_command(cmd));
+        msg.push_str(&format!("  {}", display_command(cmd)));
     }
+    msg
+}
+
+pub fn finished_linking_msg(d: Duration) -> String {
+    #[cfg(feature = "term-colors")]
+    return format!(
+        "{} [{}]",
+        "Linking finished".bold().green(),
+        format_duration(d)
+    );
+    #[cfg(not(feature = "term-colors"))]
+    return format!("Linking finished [{}]", format_duration(d));
+}
+
+pub fn finished_compilation_msg(d: Duration) -> String {
+    #[cfg(feature = "term-colors")]
+    return format!(
+        "{} [{}]",
+        "Compilation finished".bold().green(),
+        format_duration(d)
+    );
+    #[cfg(not(feature = "term-colors"))]
+    return format!("Compilation finished [{}]", format_duration(d));
 }

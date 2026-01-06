@@ -1,9 +1,13 @@
 use std::{
     io::{Write, stderr},
     path::PathBuf,
+    sync::Arc,
+    time::Duration,
 };
 
 use anyhow::{Result, bail};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 
 use crate::{
     ForgeArgs,
@@ -17,7 +21,7 @@ use crate::{
     ui::{self},
 };
 
-pub struct LinkerDirver<'a, L: Linker> {
+pub struct LinkerDirver<'a, L: Linker + Sync> {
     pub linker: L,
     pub opts: LinkOptions,
     pub project_config: &'a ProjectConfig,
@@ -25,7 +29,7 @@ pub struct LinkerDirver<'a, L: Linker> {
     pub profile: Profile,
 }
 
-impl<'a, L: Linker> LinkerDirver<'a, L> {
+impl<'a, L: Linker + Sync> LinkerDirver<'a, L> {
     pub fn default_driver(
         args: &ForgeArgs,
         project_config: &'a ProjectConfig,
@@ -99,7 +103,11 @@ impl<'a, L: Linker> LinkerDirver<'a, L> {
         }
         Ok(profile_dir)
     }
-    pub fn link_single_target(&self, link_target: &LinkTarget) -> anyhow::Result<PathBuf> {
+    pub fn link_single_target(
+        &self,
+        link_target: &LinkTarget,
+        pb: &ProgressBar,
+    ) -> anyhow::Result<PathBuf> {
         let mut lib_dirs = vec![];
         let mut libs = vec![];
 
@@ -122,8 +130,8 @@ impl<'a, L: Linker> LinkerDirver<'a, L> {
         let cannonical = match self.linker.link_cmd(&unit, &self.opts) {
             Ok(c) => c,
             Err(e) => {
-                ui::output_error_link(None, format!("{}", e).as_bytes(), link_target.kind);
-                stderr().flush()?;
+                let msg = ui::error_link_msg(None, format!("{}", e).as_bytes(), link_target.kind);
+                pb.println(msg);
                 bail!("failed to spawn link command");
             }
         };
@@ -132,23 +140,25 @@ impl<'a, L: Linker> LinkerDirver<'a, L> {
         let output = match cmd.output() {
             Ok(output) => output,
             Err(e) => {
-                ui::output_error_link(Some(&cmd), format!("{}", e).as_bytes(), link_target.kind);
-                stderr().flush()?;
+                let msg =
+                    ui::error_link_msg(Some(&cmd), format!("{}", e).as_bytes(), link_target.kind);
+                pb.println(msg);
                 bail!("failed to spawn link command");
             }
         };
+
         if output.status.success() {
-            ui::output_successfull_link(&cmd, link_target.kind);
+            let msg = ui::successfull_link_msg(&cmd, link_target.kind);
+            pb.println(msg);
         } else {
-            ui::output_error_link(Some(&cmd), &output.stderr, link_target.kind);
+            let msg = ui::error_link_msg(Some(&cmd), &output.stderr, link_target.kind);
+            pb.println(msg);
             bail!("failed to link");
         }
 
         Ok(output_path)
     }
     pub fn link(&self) -> anyhow::Result<Option<PathBuf>> {
-        let mut failed = false;
-        let mut executable_path = None;
         let targets = if !self
             .project_config
             .build
@@ -164,17 +174,55 @@ impl<'a, L: Linker> LinkerDirver<'a, L> {
                 user_flags: None,
             }]
         };
-        for link_target in targets {
-            let res = self.link_single_target(&link_target);
+
+        let mp = Arc::new(MultiProgress::new());
+
+        let total_pb = mp.add(ProgressBar::new(targets.len() as u64));
+        total_pb.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "{spinner:.green} [{elapsed_precise}] [{bar:40}] {pos}/{len} ({eta}) {msg}",
+                )
+                .unwrap()
+                .progress_chars("#>-"),
+        );
+
+        let results: Vec<_> = targets
+            .into_par_iter()
+            .map(|link_target| {
+                // Spinner für diesen Target
+                let spinner = mp.add(ProgressBar::new_spinner());
+                spinner.set_message(format!("Linking {}", link_target.name));
+                spinner.enable_steady_tick(Duration::from_millis(100));
+
+                // Link-Vorgang
+                let res = self.link_single_target(&link_target, &spinner);
+
+                spinner.finish_with_message(format!("Finished linking {}", link_target.name));
+
+                // Gesamt-PB inkrementieren
+                total_pb.inc(1);
+
+                (link_target, res)
+            })
+            .collect();
+
+        total_pb.finish_and_clear();
+        println!("{}", ui::finished_linking_msg(total_pb.elapsed()));
+        // Fehlerbehandlung
+        let mut failed = false;
+        let mut executable_path = None;
+        for (link_target, res) in results {
             if res.is_err() {
                 failed = true;
-            } else if link_target.kind == LinkTargetKind::Executable {
-                executable_path = Some(res?);
+            } else if let Ok(path) = res
+                && link_target.kind == LinkTargetKind::Executable
+            {
+                executable_path = Some(path);
             }
         }
 
         if failed {
-            stderr().flush()?;
             bail!("at least one of the linking targets failed");
         }
         Ok(executable_path)

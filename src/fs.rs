@@ -21,7 +21,7 @@ pub fn initialize_filestructure(project_name: Option<&str>) -> Result<()> {
         let project_name = match project_name {
             Some(n) => n,
             None => {
-                ui::output_no_rustyforge_initialized();
+                println!("{}", ui::no_rustyforge_initialized_msg());
                 return Ok(());
             }
         };

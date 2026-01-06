@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::config::tool::CompilerKind;
 use anyhow::{Result, bail};
 
@@ -40,4 +42,12 @@ fn is_compiler_usable(kind: CompilerKind) -> bool {
 
 fn is_usable(cmd: &str) -> bool {
     which::which(cmd).is_ok()
+}
+
+pub fn format_duration(d: Duration) -> String {
+    let secs = d.as_secs();
+    let hours = secs / 3600;
+    let minutes = (secs % 3600) / 60;
+    let seconds = secs % 60;
+    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
 }

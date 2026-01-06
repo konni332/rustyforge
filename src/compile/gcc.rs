@@ -54,16 +54,31 @@ impl Compiler for Gcc {
 
         Ok(cmd.finish())
     }
-    fn get_dependencies(&self, file: &std::path::Path) -> anyhow::Result<Vec<std::path::PathBuf>> {
+    fn get_dependencies(
+        &self,
+        unit: &super::types::CompileUnit,
+    ) -> anyhow::Result<Vec<std::path::PathBuf>> {
         let tmp_d = tempfile::NamedTempFile::new()?.into_temp_path();
 
         let mut cmd = Command::new("clang");
-        cmd.arg("-MM").arg("-MP").arg("-MF").arg(&tmp_d).arg(file);
+        cmd.arg("-MM")
+            .arg("-MP")
+            .arg("-MF")
+            .arg(&tmp_d)
+            .arg(unit.source);
+
+        for include in unit.includes {
+            cmd.arg("-I").arg(include);
+        }
+
+        for define in unit.defines {
+            cmd.arg("-D").arg(define);
+        }
 
         let output = cmd.output()?;
 
         if !output.status.success() {
-            output_error_compile(file, &cmd, &output.stderr);
+            output_error_compile(unit.source, &cmd, &output.stderr);
             bail!("Dependency collection failed");
         }
 
@@ -75,8 +90,5 @@ impl Compiler for Gcc {
         }
 
         Ok(deps)
-    }
-    fn id(&self) -> &'static str {
-        "gcc"
     }
 }

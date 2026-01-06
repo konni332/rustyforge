@@ -49,7 +49,7 @@ pub fn output_error_compile(file_path: &Path, cmd: &Command, error: &[u8]) {
         if verbosity > 0 {
             msg.push_str(&format!(": {}", display_command(cmd)));
         }
-        println!("{}", msg);
+        eprintln!("{}", msg);
     }
     #[cfg(not(feature = "term-colors"))]
     {
@@ -57,7 +57,7 @@ pub fn output_error_compile(file_path: &Path, cmd: &Command, error: &[u8]) {
         if verbosity > 0 {
             msg.push_str(&format!(": {}", display_command(cmd)));
         }
-        println!("{}", msg);
+        eprintln!("{}", msg);
     }
 }
 
@@ -84,7 +84,7 @@ pub fn output_successfull_link(cmd: &Command, link_target_kind: LinkTargetKind) 
     }
 }
 
-pub fn output_error_link(cmd: &Command, error: &[u8], link_target_kind: LinkTargetKind) {
+pub fn output_error_link(cmd: Option<&Command>, error: &[u8], link_target_kind: LinkTargetKind) {
     let err_msg = String::from_utf8_lossy(error);
 
     #[cfg(feature = "term-colors")]
@@ -97,18 +97,22 @@ pub fn output_error_link(cmd: &Command, error: &[u8], link_target_kind: LinkTarg
             link_target_kind,
             err_msg
         );
-        if get_verbosity!() > 0 {
-            msg.push_str(&format!(": {}", display_command(cmd)));
+        if get_verbosity!() > 0
+            && let Some(c) = cmd
+        {
+            msg.push_str(&format!(": {}", display_command(c)));
         }
-        println!("{}", msg);
+        eprintln!("{}", msg);
     }
     #[cfg(not(feature = "term-colors"))]
     {
         let mut msg = format!("{} {}:\n{}", "Failed to link", link_target_kind, err_msg);
-        if get_verbosity!() > 0 {
-            msg.push_str(&format!(": {}", display_command(cmd)));
+        if get_verbosity!() > 0
+            && let Some(c) = cmd
+        {
+            msg.push_str(&format!(": {}", display_command(c)));
         }
-        println!("{}", msg);
+        eprintln!("{}", msg);
     }
 }
 
@@ -210,7 +214,7 @@ fn shell_escape(s: &std::ffi::OsStr) -> String {
     }
 }
 
-fn display_command(cmd: &Command) -> String {
+pub fn display_command(cmd: &Command) -> String {
     let program = shell_escape(cmd.get_program());
 
     let args = cmd

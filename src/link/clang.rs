@@ -15,9 +15,6 @@ impl Linker for ClangLinker {
     fn new() -> Self {
         ClangLinker
     }
-    fn id(&self) -> &'static str {
-        "clang"
-    }
     fn link_cmd(
         &self,
         unit: &super::types::LinkUnit,

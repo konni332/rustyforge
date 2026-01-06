@@ -12,9 +12,6 @@ impl Linker for MsvcLinker {
     fn new() -> Self {
         MsvcLinker
     }
-    fn id(&self) -> &'static str {
-        "msvc"
-    }
     fn link_cmd(
         &self,
         unit: &super::types::LinkUnit,

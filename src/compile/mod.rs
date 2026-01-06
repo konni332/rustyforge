@@ -17,19 +17,7 @@ pub use msvc::Msvc;
 
 pub trait Compiler {
     fn compile_cmd(&self, unit: &CompileUnit, opts: &CompileOptions) -> Result<CannonicalCommand>;
-    fn compile_batch_cmd(
-        &self,
-        units: &[CompileUnit],
-        opts: &CompileOptions,
-    ) -> Result<Vec<CannonicalCommand>> {
-        let mut cmds = vec![];
-        for unit in units {
-            cmds.push(self.compile_cmd(unit, opts)?);
-        }
-        Ok(cmds)
-    }
-    fn get_dependencies(&self, file: &Path) -> Result<Vec<PathBuf>>;
-    fn id(&self) -> &'static str;
+    fn get_dependencies(&self, unit: &CompileUnit) -> Result<Vec<PathBuf>>;
     fn new() -> Self;
 }
 

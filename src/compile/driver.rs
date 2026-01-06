@@ -72,13 +72,13 @@ impl<C: Compiler> CompilerDriver<C> {
                 .project
                 .profile_debug
                 .as_ref()
-                .map(|p| p.flags.clone())
+                .and_then(|p| p.flags.clone())
                 .unwrap_or(vec![]),
             Profile::Release => project_config
                 .project
                 .profile_release
                 .as_ref()
-                .map(|p| p.flags.clone())
+                .and_then(|p| p.flags.clone())
                 .unwrap_or(vec![]),
         };
         let defines = match profile {
@@ -160,12 +160,17 @@ impl<C: Compiler> CompilerDriver<C> {
             .filter_map(|e| e.ok())
         {
             let path = entry.path();
-            if path.extension().map(|e| e == "h").unwrap_or(false)
-                && let Some(parent) = path.parent()
-                && dirs.insert(parent.to_path_buf(), ()).is_some()
-                && get_verbosity!() > 0
-            {
-                output_discovered_dir(parent);
+            if path.extension().map(|e| e == "h").unwrap_or(false) {
+                let mut current = path.parent();
+                while let Some(parent) = current {
+                    if dirs.insert(parent.to_path_buf(), ()).is_some() {
+                        break;
+                    }
+                    if get_verbosity!() > 0 {
+                        output_discovered_dir(parent);
+                    }
+                    current = parent.parent();
+                }
             }
         }
 
@@ -188,6 +193,9 @@ impl<C: Compiler> CompilerDriver<C> {
         content.hash(&mut hasher);
 
         for dep in deps {
+            if !dep.exists() {
+                continue;
+            }
             let dep_content = std::fs::read(dep).context(format!(
                 "Failed to read dependency content from: {}",
                 dep.display()
@@ -207,15 +215,15 @@ impl<C: Compiler> CompilerDriver<C> {
         let mut cmds = Vec::new();
 
         for file in files {
-            let mut deps = self.compiler.get_dependencies(&file)?;
-            deps.sort();
-
             let unit = CompileUnit {
                 source: &file,
                 includes: &includes,
                 defines: &defines,
             };
+            let mut deps = self.compiler.get_dependencies(&unit)?;
 
+            deps.retain(|pb| !self.should_be_ignored(pb));
+            deps.sort();
             let cmd = self.compiler.compile_cmd(&unit, &self.opts)?;
             let hash = self.compute_command_hash(&cmd, &file, &deps)?;
             if self.cache.map.get(&hash).is_some_and(|p| *p == file) {

@@ -32,7 +32,7 @@ pub fn execute(forge_args: ForgeArgs) -> Result<()> {
         return execute_remove();
     }
 
-    let tool_config = load_tool_config()?;
+    let tool_config = load_tool_config().unwrap_or_default();
     let project_config = load_project_config()?;
     match &forge_args.command {
         Command::Init => execute_init(),

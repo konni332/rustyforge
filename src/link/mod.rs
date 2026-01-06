@@ -18,6 +18,5 @@ pub use msvc::MsvcLinker;
 
 pub trait Linker {
     fn new() -> Self;
-    fn id(&self) -> &'static str;
     fn link_cmd(&self, unit: &LinkUnit, opts: &LinkOptions) -> Result<CannonicalCommand>;
 }

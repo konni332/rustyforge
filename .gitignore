@@ -13,4 +13,8 @@
 
 /test-c-project/
 **/sds/**
+**/curl/**
 
+**/RustyForge.toml
+**/.rustyforge/**
+**/target/**

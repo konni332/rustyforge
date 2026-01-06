@@ -21,7 +21,7 @@ pub struct Project {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProfileConfig {
-    pub flags: Vec<String>,
+    pub flags: Option<Vec<String>>,
     pub defines: Vec<String>,
     pub compiler: Option<CompilerKind>,
 }
@@ -29,13 +29,14 @@ pub struct ProfileConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Build {
     pub ignore_patterns: Vec<String>,
-    pub link_targets: Vec<LinkTarget>,
+    pub link_targets: Option<Vec<LinkTarget>>,
+    pub pre_build_commands: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LinkTarget {
     pub name: String,
-    pub user_flags: Vec<String>,
+    pub user_flags: Option<Vec<String>>,
     pub kind: LinkTargetKind,
 }
 
@@ -94,7 +95,7 @@ impl Build {
     pub fn new() -> Self {
         Self {
             ignore_patterns: vec![],
-            link_targets: vec![],
+            link_targets: None,
         }
     }
 }

@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    io::{Write, stderr},
+    path::PathBuf,
+};
 
 use anyhow::{Result, bail};
 
@@ -11,7 +14,7 @@ use crate::{
         Linker,
         types::{LinkOptions, LinkUnit},
     },
-    ui,
+    ui::{self},
 };
 
 pub struct LinkerDirver<'a, L: Linker> {
@@ -107,22 +110,37 @@ impl<'a, L: Linker> LinkerDirver<'a, L> {
             libs.extend_from_slice(&dep.libs);
         }
 
+        let user_flags = &link_target.user_flags.clone().unwrap_or(vec![]);
         let unit = LinkUnit {
-            user_flags: &link_target.user_flags,
+            user_flags,
             kind: link_target.kind,
             objects: &self.objects,
             output: output_path.clone(),
             lib_dirs,
             libs,
         };
+        let cannonical = match self.linker.link_cmd(&unit, &self.opts) {
+            Ok(c) => c,
+            Err(e) => {
+                ui::output_error_link(None, format!("{}", e).as_bytes(), link_target.kind);
+                stderr().flush()?;
+                bail!("failed to spawn link command");
+            }
+        };
+        let mut cmd = std::process::Command::from(&cannonical);
 
-        let mut cmd = std::process::Command::from(&self.linker.link_cmd(&unit, &self.opts)?);
-
-        let output = cmd.output()?;
+        let output = match cmd.output() {
+            Ok(output) => output,
+            Err(e) => {
+                ui::output_error_link(Some(&cmd), format!("{}", e).as_bytes(), link_target.kind);
+                stderr().flush()?;
+                bail!("failed to spawn link command");
+            }
+        };
         if output.status.success() {
             ui::output_successfull_link(&cmd, link_target.kind);
         } else {
-            ui::output_error_link(&cmd, &output.stderr, link_target.kind);
+            ui::output_error_link(Some(&cmd), &output.stderr, link_target.kind);
             bail!("failed to link");
         }
 
@@ -131,17 +149,23 @@ impl<'a, L: Linker> LinkerDirver<'a, L> {
     pub fn link(&self) -> anyhow::Result<Option<PathBuf>> {
         let mut failed = false;
         let mut executable_path = None;
-        let targets = if !self.project_config.build.link_targets.is_empty() {
-            &self.project_config.build.link_targets
+        let targets = if !self
+            .project_config
+            .build
+            .link_targets
+            .as_ref()
+            .is_none_or(|lt| lt.is_empty())
+        {
+            self.project_config.build.link_targets.clone().unwrap()
         } else {
-            &vec![LinkTarget {
+            vec![LinkTarget {
                 name: self.project_config.project.name.clone(),
                 kind: LinkTargetKind::Executable,
-                user_flags: vec![],
+                user_flags: None,
             }]
         };
         for link_target in targets {
-            let res = self.link_single_target(link_target);
+            let res = self.link_single_target(&link_target);
             if res.is_err() {
                 failed = true;
             } else if link_target.kind == LinkTargetKind::Executable {
@@ -150,6 +174,7 @@ impl<'a, L: Linker> LinkerDirver<'a, L> {
         }
 
         if failed {
+            stderr().flush()?;
             bail!("at least one of the linking targets failed");
         }
         Ok(executable_path)

@@ -15,9 +15,6 @@ impl Linker for GccLinker {
     fn new() -> Self {
         GccLinker
     }
-    fn id(&self) -> &'static str {
-        "gcc"
-    }
     fn link_cmd(
         &self,
         unit: &super::types::LinkUnit,

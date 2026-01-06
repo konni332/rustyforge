@@ -3,10 +3,12 @@ use std::{
     hash::{Hash, Hasher},
     path::{Path, PathBuf},
     process::Command,
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 use anyhow::{Context, Result};
 use globset::{Glob, GlobSet, GlobSetBuilder};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use twox_hash::XxHash64;
 use verbosio::get_verbosity;
@@ -22,7 +24,7 @@ use crate::{
     ui::{self, output_discovered_dir, output_discovered_file},
 };
 
-pub struct CompilerDriver<C: Compiler> {
+pub struct CompilerDriver<C: Compiler + Sync> {
     pub compiler: C,
     pub ignore_set: GlobSet,
     pub opts: CompileOptions,
@@ -53,7 +55,7 @@ impl BuildCache {
     }
 }
 
-impl<C: Compiler> CompilerDriver<C> {
+impl<C: Compiler + Sync> CompilerDriver<C> {
     pub fn default_driver<P: AsRef<Path>>(
         root: P,
         args: &ForgeArgs,
@@ -136,16 +138,13 @@ impl<C: Compiler> CompilerDriver<C> {
     }
     fn discover_files(&self) -> Result<Vec<PathBuf>> {
         let mut files = vec![];
-        for entry in walkdir::WalkDir::new(".")
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
+        for entry in jwalk::WalkDir::new(".").into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
             if path.extension().map(|ext| ext == "c").unwrap_or(false)
-                && !self.should_be_ignored(path)
+                && !self.should_be_ignored(&path)
             {
                 if get_verbosity!() > 0 {
-                    output_discovered_file(path);
+                    output_discovered_file(&path);
                 }
                 files.push(path.to_path_buf());
             }
@@ -155,10 +154,7 @@ impl<C: Compiler> CompilerDriver<C> {
     fn discover_include_dirs(&self) -> Result<Vec<PathBuf>> {
         let mut dirs = HashMap::<PathBuf, ()>::new();
 
-        for entry in walkdir::WalkDir::new(".")
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
+        for entry in jwalk::WalkDir::new(".").into_iter().filter_map(|e| e.ok()) {
             let path = entry.path();
             if path.extension().map(|e| e == "h").unwrap_or(false) {
                 let mut current = path.parent();
@@ -212,51 +208,78 @@ impl<C: Compiler> CompilerDriver<C> {
         includes.sort();
         let mut defines = self.opts.defines.clone();
         defines.sort();
-        let mut cmds = Vec::new();
+        let cmds: Result<Vec<(PathBuf, u64, std::process::Command)>> = files
+            .into_par_iter()
+            .map(|file| {
+                let unit = CompileUnit {
+                    source: &file,
+                    includes: &includes,
+                    defines: &defines,
+                };
+                let mut deps = self.compiler.get_dependencies(&unit)?;
 
-        for file in files {
-            let unit = CompileUnit {
-                source: &file,
-                includes: &includes,
-                defines: &defines,
-            };
-            let mut deps = self.compiler.get_dependencies(&unit)?;
+                deps.retain(|pb| !self.should_be_ignored(pb));
+                deps.sort();
+                let cmd = self.compiler.compile_cmd(&unit, &self.opts)?;
+                let hash = self.compute_command_hash(&cmd, &file, &deps)?;
+                if self.cache.map.get(&hash).is_some_and(|p| *p == file) {
+                    return Ok(None);
+                }
 
-            deps.retain(|pb| !self.should_be_ignored(pb));
-            deps.sort();
-            let cmd = self.compiler.compile_cmd(&unit, &self.opts)?;
-            let hash = self.compute_command_hash(&cmd, &file, &deps)?;
-            if self.cache.map.get(&hash).is_some_and(|p| *p == file) {
-                continue;
-            }
-
-            cmds.push((file.to_path_buf(), hash, Command::from(&cmd)));
-        }
+                Ok(Some((file.to_path_buf(), hash, Command::from(&cmd))))
+            })
+            .filter_map(|res| match res {
+                Ok(Some(v)) => Some(Ok(v)),
+                Ok(None) => None,
+                Err(e) => Some(Err(e)),
+            })
+            .collect();
+        let cmds = cmds?;
 
         Ok(cmds)
     }
 
     pub fn compile_incremental(&mut self) -> Result<()> {
-        let mut failed = false;
         let cmds = self.resolve_incremental()?;
-        for (path, hash, mut cmd) in cmds {
-            let output = cmd.output()?;
-            if output.status.success() {
-                ui::output_successfull_compile(&path, &cmd);
-                self.cache.map.insert(hash, path.clone());
-            } else {
-                ui::output_error_compile(&path, &cmd, &output.stderr);
-                failed = true;
-            }
+        let failed = AtomicBool::new(false);
+
+        // Threads sammeln erfolgreiche Updates lokal
+        let updates: Vec<(u64, PathBuf)> = cmds
+            .into_par_iter()
+            .filter_map(|(path, hash, mut cmd)| {
+                let output = match cmd.output() {
+                    Ok(o) => o,
+                    Err(e) => {
+                        ui::output_error_compile(&path, &cmd, format!("{}", e).as_bytes());
+                        failed.store(true, Ordering::Relaxed);
+                        return None;
+                    }
+                };
+
+                if output.status.success() {
+                    ui::output_successfull_compile(&path, &cmd);
+                    Some((hash, path))
+                } else {
+                    ui::output_error_compile(&path, &cmd, &output.stderr);
+                    failed.store(true, Ordering::Relaxed);
+                    None
+                }
+            })
+            .collect();
+
+        for (hash, path) in updates {
+            self.cache.map.insert(hash, path);
         }
-        if failed {
+
+        if failed.load(Ordering::Relaxed) {
             anyhow::bail!("compilation failed");
         }
+
         Ok(())
     }
 }
 
-impl<C: Compiler> Drop for CompilerDriver<C> {
+impl<C: Compiler + Sync> Drop for CompilerDriver<C> {
     fn drop(&mut self) {
         self.cache.save_cache().ok();
     }

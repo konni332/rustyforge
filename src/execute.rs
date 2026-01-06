@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 
 use crate::{
     ForgeArgs,
@@ -143,11 +143,14 @@ fn run_prebuild_commands(cmds: &[String]) -> Result<()> {
             .first()
             .context(format!("Failed to get executable from: {}", cmd))?;
         let args = &parts[1..];
+        let mut c = std::process::Command::new(exe);
+        c.args(args);
+        ui::output_running_prebuild_command(&c);
+        let status = c.status().context("Failed to execute pre-build command")?;
 
-        let status = std::process::Command::new(exe).args(args).status()?;
-
-        if !status.success() {
-            bail!("Pre-Build command failed: {}", cmd);
+        match status.code() {
+            Some(code) => ui::output_run_exit_code(code),
+            None => ui::output_run_exit_signal(),
         }
     }
     Ok(())

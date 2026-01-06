@@ -49,7 +49,7 @@ impl<'a, L: Linker> LinkerDirver<'a, L> {
     }
     pub fn discover_objects(profile: Profile) -> Result<Vec<PathBuf>> {
         let obj_dir = object_dir(profile_dir(profile)?);
-        Ok(walkdir::WalkDir::new(obj_dir)
+        Ok(jwalk::WalkDir::new(obj_dir)
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| e.path().extension().and_then(|e| e.to_str()) == Some("o"))

@@ -3,6 +3,7 @@ mod compile;
 mod config;
 mod execute;
 mod fs;
+mod link;
 mod ui;
 mod utils;
 

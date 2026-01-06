@@ -66,7 +66,7 @@ impl<C: Compiler> CompilerDriver<C> {
         };
         let object_dir = object_dir(profile_dir);
         std::fs::create_dir_all(&object_dir)?;
-        let ignore_pattern_strings = &project_config.compilation.ignore_patterns;
+        let ignore_pattern_strings = &project_config.build.ignore_patterns;
         let user_flags = match profile {
             Profile::Debug => project_config
                 .project

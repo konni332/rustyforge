@@ -55,6 +55,20 @@ pub fn create_profile_dir(profile: Profile) -> Result<()> {
     Ok(())
 }
 
+pub fn profile_dir(profile: Profile) -> Result<PathBuf> {
+    let cwd = std::env::current_dir()?;
+    match profile {
+        Profile::Debug => {
+            let debug_dir = debug_dir(cwd);
+            Ok(debug_dir)
+        }
+        Profile::Release => {
+            let release_dir = release_dir(cwd);
+            Ok(release_dir)
+        }
+    }
+}
+
 pub fn remove_file_structure() -> Result<()> {
     let cwd = std::env::current_dir().context("Failed to determine current working directory")?;
     let toml_path = toml_path(&cwd);
@@ -125,14 +139,6 @@ pub fn load_tool_config() -> Result<ToolConfig> {
     Ok(config)
 }
 
-pub fn write_tool_config(config: &ToolConfig) -> Result<()> {
-    let cwd = std::env::current_dir()?;
-    let config_str = toml::to_string_pretty(config)?;
-    let config_path = config_path(cwd);
-    std::fs::write(config_path, config_str)?;
-    Ok(())
-}
-
 pub fn load_project_config() -> Result<ProjectConfig> {
     let cwd = std::env::current_dir()?;
     let config_path = toml_path(&cwd);
@@ -140,12 +146,4 @@ pub fn load_project_config() -> Result<ProjectConfig> {
     let config_str = std::fs::read_to_string(config_path).context("No config.toml found")?;
     let config = toml::from_str(&config_str)?;
     Ok(config)
-}
-
-pub fn write_project_config(config: &ProjectConfig) -> Result<()> {
-    let cwd = std::env::current_dir()?;
-    let config_str = toml::to_string_pretty(config)?;
-    let config_path = toml_path(cwd);
-    std::fs::write(config_path, config_str)?;
-    Ok(())
 }

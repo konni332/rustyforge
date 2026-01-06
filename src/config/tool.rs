@@ -12,9 +12,3 @@ pub enum CompilerKind {
     Clang,
     Msvc,
 }
-
-impl ToolConfig {
-    pub fn new() -> Self {
-        Self { compiler: None }
-    }
-}

@@ -61,20 +61,6 @@ impl CannonicalCommandBuilder {
         }
         self
     }
-    pub fn env<S: AsRef<OsStr>>(&mut self, env: (S, S)) {
-        self.envs.push((
-            env.0.as_ref().to_string_lossy().to_string(),
-            env.1.as_ref().to_string_lossy().to_string(),
-        ));
-    }
-    pub fn envs<S: AsRef<OsStr>, I: IntoIterator<Item = (S, S)>>(&mut self, envs: I) {
-        for env in envs {
-            self.env(env);
-        }
-    }
-    pub fn current_dir<P: AsRef<Path>>(&mut self, path: P) {
-        self.cwd = Some(path.as_ref().to_path_buf())
-    }
     pub fn finish(self) -> CannonicalCommand {
         let program = self.program;
         let args = self.args;

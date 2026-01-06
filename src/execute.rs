@@ -14,6 +14,7 @@ use crate::{
         create_profile_dir, initialize_filestructure, load_project_config, load_tool_config,
         remove_file_structure, remove_target_dir,
     },
+    link::{ClangLinker, GccLinker, LinkerDirver, MsvcLinker},
     ui,
     utils::resolve_compiler,
 };
@@ -24,6 +25,13 @@ pub fn execute(forge_args: ForgeArgs) -> Result<()> {
     } else if forge_args.verbose {
         verbosio::set_verbosity!(1);
     }
+    if forge_args.command == Command::Init {
+        return execute_init();
+    }
+    if forge_args.command == Command::Remove {
+        return execute_remove();
+    }
+
     let tool_config = load_tool_config()?;
     let project_config = load_project_config()?;
     match &forge_args.command {
@@ -40,7 +48,7 @@ pub fn execute(forge_args: ForgeArgs) -> Result<()> {
             execute_run(&forge_args, opts, args, &project_config, &tool_config)
         }
         Command::Clean => execute_clean(),
-        Command::Remove => execute_remove(),
+        _ => Ok(()),
     }
 }
 
@@ -72,7 +80,7 @@ fn execute_build(
     opts: &ForgeOptions,
     project_config: &ProjectConfig,
     tool_config: &ToolConfig,
-) -> Result<PathBuf> {
+) -> Result<Option<PathBuf>> {
     let project_config_compiler = match opts.profile().unwrap_or(Profile::Debug) {
         Profile::Debug => project_config
             .project
@@ -103,7 +111,22 @@ fn execute_build(
             driver.compile_incremental()?;
         }
     };
-    Ok(PathBuf::from("place-holder"))
+    let executable_path = match compiler_kind {
+        CompilerKind::Clang => {
+            let driver = LinkerDirver::<ClangLinker>::default_driver(args, project_config)?;
+            driver.link()?
+        }
+        CompilerKind::Gcc => {
+            let driver = LinkerDirver::<GccLinker>::default_driver(args, project_config)?;
+            driver.link()?
+        }
+        CompilerKind::Msvc => {
+            let driver = LinkerDirver::<MsvcLinker>::default_driver(args, project_config)?;
+            driver.link()?
+        }
+    };
+
+    Ok(executable_path)
 }
 
 fn execute_run(
@@ -113,8 +136,15 @@ fn execute_run(
     project_config: &ProjectConfig,
     tool_config: &ToolConfig,
 ) -> Result<()> {
-    execute_build(args, opts, project_config, tool_config)?;
-    unimplemented!()
+    let exe_path = execute_build(args, opts, project_config, tool_config)?
+        .context("Can only run executable. Try adding executable linker target")?;
+    let mut cmd = std::process::Command::new(exe_path);
+    let status = cmd.args(program_args).status()?;
+    match status.code() {
+        Some(code) => ui::output_run_exit_code(code),
+        None => ui::output_run_exit_signal(),
+    }
+    Ok(())
 }
 
 fn execute_rebuild(

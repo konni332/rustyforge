@@ -29,7 +29,7 @@ pub struct ProfileConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Build {
     pub ignore_patterns: Vec<String>,
-    pub link_targets: Option<Vec<LinkTarget>>,
+    pub link_target: Option<Vec<LinkTarget>>,
     pub pre_build_commands: Option<Vec<String>>,
 }
 
@@ -95,7 +95,7 @@ impl Build {
     pub fn new() -> Self {
         Self {
             ignore_patterns: vec![],
-            link_targets: None,
+            link_target: None,
             pre_build_commands: None,
         }
     }

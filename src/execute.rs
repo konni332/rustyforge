@@ -31,9 +31,17 @@ pub fn execute(forge_args: ForgeArgs) -> Result<()> {
     if forge_args.command == Command::Remove {
         return execute_remove();
     }
+    if let Command::New { project_name } = &forge_args.command {
+        return execute_new(project_name);
+    }
 
     let tool_config = load_tool_config().unwrap_or_default();
-    let project_config = load_project_config()?;
+    let project_config = match load_project_config()? {
+        Some(config) => config,
+        None => {
+            return Ok(());
+        }
+    };
     match &forge_args.command {
         Command::Init => execute_init(),
         Command::New { project_name } => execute_new(project_name),
@@ -64,7 +72,12 @@ fn execute_init() -> Result<()> {
 }
 
 fn execute_new(name: &str) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    let new_path = cwd.join(name);
+    std::fs::create_dir_all(&new_path)?;
+    std::env::set_current_dir(new_path)?;
     initialize_filestructure(Some(name))?;
+    std::env::set_current_dir(cwd)?;
     println!("{}", ui::rustyforge_new_msg(name));
     Ok(())
 }

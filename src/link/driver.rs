@@ -1,9 +1,4 @@
-use std::{
-    io::{Write, stderr},
-    path::PathBuf,
-    sync::Arc,
-    time::Duration,
-};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::{Result, bail};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -159,14 +154,14 @@ impl<'a, L: Linker + Sync> LinkerDirver<'a, L> {
         Ok(output_path)
     }
     pub fn link(&self) -> anyhow::Result<Option<PathBuf>> {
-        let targets = if !self
+        let targets = if self
             .project_config
             .build
-            .link_targets
+            .link_target
             .as_ref()
-            .is_none_or(|lt| lt.is_empty())
+            .is_some_and(|lt| !lt.is_empty())
         {
-            self.project_config.build.link_targets.clone().unwrap()
+            self.project_config.build.link_target.clone().unwrap()
         } else {
             vec![LinkTarget {
                 name: self.project_config.project.name.clone(),
@@ -198,7 +193,7 @@ impl<'a, L: Linker + Sync> LinkerDirver<'a, L> {
                 // Link-Vorgang
                 let res = self.link_single_target(&link_target, &spinner);
 
-                spinner.finish_with_message(format!("Finished linking {}", link_target.name));
+                spinner.finish_and_clear();
 
                 // Gesamt-PB inkrementieren
                 total_pb.inc(1);
@@ -208,7 +203,6 @@ impl<'a, L: Linker + Sync> LinkerDirver<'a, L> {
             .collect();
 
         total_pb.finish_and_clear();
-        println!("{}", ui::finished_linking_msg(total_pb.elapsed()));
         // Fehlerbehandlung
         let mut failed = false;
         let mut executable_path = None;
@@ -224,6 +218,8 @@ impl<'a, L: Linker + Sync> LinkerDirver<'a, L> {
 
         if failed {
             bail!("at least one of the linking targets failed");
+        } else {
+            println!("{}", ui::finished_linking_msg(total_pb.elapsed()));
         }
         Ok(executable_path)
     }

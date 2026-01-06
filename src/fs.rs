@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use crate::{
     compile::types::Profile,
     config::{project::ProjectConfig, tool::ToolConfig},
-    ui,
+    ui::{self, no_rustyforge_initialized_msg},
 };
 
 pub fn initialize_filestructure(project_name: Option<&str>) -> Result<()> {
@@ -139,11 +139,14 @@ pub fn load_tool_config() -> Result<ToolConfig> {
     Ok(config)
 }
 
-pub fn load_project_config() -> Result<ProjectConfig> {
+pub fn load_project_config() -> Result<Option<ProjectConfig>> {
     let cwd = std::env::current_dir()?;
     let config_path = toml_path(&cwd);
-
-    let config_str = std::fs::read_to_string(config_path).context("No config.toml found")?;
+    if !config_path.exists() {
+        let msg = no_rustyforge_initialized_msg();
+        println!("{}", msg);
+    }
+    let config_str = std::fs::read_to_string(config_path).context("No RustyForge.toml found")?;
     let config = toml::from_str(&config_str)?;
-    Ok(config)
+    Ok(Some(config))
 }

@@ -185,17 +185,14 @@ impl<'a, L: Linker + Sync> LinkerDirver<'a, L> {
         let results: Vec<_> = targets
             .into_par_iter()
             .map(|link_target| {
-                // Spinner für diesen Target
                 let spinner = mp.add(ProgressBar::new_spinner());
                 spinner.set_message(format!("Linking {}", link_target.name));
                 spinner.enable_steady_tick(Duration::from_millis(100));
 
-                // Link-Vorgang
                 let res = self.link_single_target(&link_target, &spinner);
 
                 spinner.finish_and_clear();
 
-                // Gesamt-PB inkrementieren
                 total_pb.inc(1);
 
                 (link_target, res)
@@ -203,7 +200,6 @@ impl<'a, L: Linker + Sync> LinkerDirver<'a, L> {
             .collect();
 
         total_pb.finish_and_clear();
-        // Fehlerbehandlung
         let mut failed = false;
         let mut executable_path = None;
         for (link_target, res) in results {

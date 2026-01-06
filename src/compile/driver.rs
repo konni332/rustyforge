@@ -139,7 +139,18 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
     }
     fn discover_files(&self) -> Result<Vec<PathBuf>> {
         let mut files = vec![];
-        for entry in jwalk::WalkDir::new(".").into_iter().filter_map(|e| e.ok()) {
+        for entry in jwalk::WalkDir::new(".")
+            .skip_hidden(true)
+            .process_read_dir(|_depth, _path, _state, entries| {
+                for e in entries.iter_mut().flatten() {
+                    if e.path().join("RustyForge.toml").is_file() {
+                        e.read_children_path = None;
+                    }
+                }
+            })
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             let path = entry.path();
             if path.extension().map(|ext| ext == "c").unwrap_or(false)
                 && !self.should_be_ignored(&path)
@@ -155,17 +166,32 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
     fn discover_include_dirs(&self) -> Result<Vec<PathBuf>> {
         let mut dirs = HashMap::<PathBuf, ()>::new();
 
-        for entry in jwalk::WalkDir::new(".").into_iter().filter_map(|e| e.ok()) {
+        for entry in jwalk::WalkDir::new(".")
+            .skip_hidden(true)
+            .process_read_dir(|_depth, _path, _state, entries| {
+                for e in entries.iter_mut().flatten() {
+                    if e.path().join("RustyForge.toml").is_file() {
+                        e.read_children_path = None;
+                    }
+                }
+            })
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             let path = entry.path();
+
             if path.extension().map(|e| e == "h").unwrap_or(false) {
                 let mut current = path.parent();
+
                 while let Some(parent) = current {
                     if dirs.insert(parent.to_path_buf(), ()).is_some() {
                         break;
                     }
+
                     if get_verbosity!() > 0 {
                         discovered_dir_msg(parent);
                     }
+
                     current = parent.parent();
                 }
             }

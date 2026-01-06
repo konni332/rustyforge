@@ -141,10 +141,14 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
         let mut files = vec![];
         for entry in jwalk::WalkDir::new(".")
             .skip_hidden(true)
-            .process_read_dir(|_depth, _path, _state, entries| {
-                for e in entries.iter_mut().flatten() {
-                    if e.path().join("RustyForge.toml").is_file() {
-                        e.read_children_path = None;
+            .process_read_dir(|depth, _path, _state, entries| {
+                if let Some(depth) = depth
+                    && depth >= 1
+                {
+                    for entry in entries.iter_mut().flatten() {
+                        if entry.path().join("RustyForge.toml").is_file() {
+                            entry.read_children_path = None; // Unterbaum ignorieren
+                        }
                     }
                 }
             })
@@ -168,10 +172,14 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
 
         for entry in jwalk::WalkDir::new(".")
             .skip_hidden(true)
-            .process_read_dir(|_depth, _path, _state, entries| {
-                for e in entries.iter_mut().flatten() {
-                    if e.path().join("RustyForge.toml").is_file() {
-                        e.read_children_path = None;
+            .process_read_dir(|depth, _path, _state, entries| {
+                if let Some(depth) = depth
+                    && depth >= 1
+                {
+                    for entry in entries.iter_mut().flatten() {
+                        if entry.path().join("RustyForge.toml").is_file() {
+                            entry.read_children_path = None; // Unterbaum ignorieren
+                        }
                     }
                 }
             })

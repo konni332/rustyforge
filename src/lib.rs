@@ -1,11 +1,4 @@
-mod cli;
-mod compile;
-mod config;
-mod execute;
-mod fs;
-mod link;
-mod ui;
-mod utils;
+pub const RUSTYFORGE_VERSION: &str = "0.4.1";
 
-pub use cli::ForgeArgs;
-pub use execute::execute;
+mod cli;
+mod config;

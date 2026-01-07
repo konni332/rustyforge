@@ -1,116 +1,101 @@
-use clap::{Args, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 
-use crate::compile::types::Profile;
+use crate::RUSTYFORGE_VERSION;
 
-#[derive(Parser, Debug, Clone)]
-#[command(
-    name = "rustyforge",
-    about = "A simple, lightweight build tool for C",
-    version = "0.4.1",
-    author = "<konni332>",
-    subcommand_required = true,
-    arg_required_else_help = true,
-    override_usage = "rustyforge <COMMAND> [OPTIONS]"
-)]
-pub struct ForgeArgs {
-    /// show verbose output
-    #[arg(long, global = true)]
+/// RustyForge CLI
+///
+/// This is the main entry point for interacting with RustyForge projects.
+/// Provides commands to build, run, check, clean, and inspect your project.
+#[derive(Debug, Clone, Parser)]
+#[command(version = RUSTYFORGE_VERSION)]
+pub struct Cli {
+    /// Enable verbose output
+    #[arg(long, short, conflicts_with = "quiet", global = true)]
     pub verbose: bool,
 
-    /// show verbose output, with raw paths
-    #[arg(long = "verbose-hard", global = true, conflicts_with = "verbose")]
-    pub verbose_hard: bool,
+    /// Suppress output (quiet mode)
+    #[arg(long, short, global = true, conflicts_with = "info")]
+    pub quiet: bool,
 
+    /// Activate features by name
+    ///
+    /// Multiple features can be specified, e.g. `--features terminal-colors,logging`
+    #[arg(long, global = true)]
+    pub features: Option<Vec<String>>,
+
+    /// The subcommand to execute
     #[command(subcommand)]
-    pub command: Command,
+    pub command: CliCommand,
 }
 
-#[derive(Subcommand, Debug, PartialEq, Clone)]
-pub enum Command {
-    /// Compile and link a C project
+/// RustyForge subcommands
+#[derive(Debug, Clone, Subcommand)]
+pub enum CliCommand {
+    /// Compile and link your project
     Build {
         #[command(flatten)]
-        opts: ForgeOptions,
+        opts: BuildOptions,
     },
-    /// Clean the project all build artifacts, unless otherwise specified
-    Clean,
-    /// Build and run the project
+
+    /// Compile, link, and run a binary
+    ///
+    /// Accepts additional arguments after `--` which are passed directly to the program.
     Run {
         #[command(flatten)]
-        opts: ForgeOptions,
+        opts: BuildOptions,
+
+        /// Arguments to pass to the program being executed
         #[arg(value_name = "ARGS", trailing_var_arg = true)]
         args: Vec<String>,
     },
-    /// Rebuild the project
-    Rebuild {
-        #[command(flatten)]
-        opts: ForgeOptions,
+
+    /// Validate the manifest and discovered sources without building
+    Check,
+
+    /// Remove all build artifacts (e.g., target directory)
+    Clean,
+
+    /// Display project metadata and configuration
+    Info {
+        /// Output information in JSON format
+        #[arg(long)]
+        json: bool,
     },
-    /// Initialize a new project in current directory
-    Init,
-    /// Create a new project in a new directory
-    New { project_name: String },
-    /// Remove all files related to RustyForge in the current directory
-    Remove,
 }
 
-#[derive(Args, Debug, PartialEq, Clone)]
-pub struct ForgeOptions {
-    /// specify the build profile as debug (default)
-    #[arg(long, conflicts_with = "release")]
-    pub debug: bool,
-    /// specify the build profile as release
-    #[arg(long, conflicts_with = "debug")]
+/// Options common to Build and Run commands
+#[derive(Debug, Clone, Parser)]
+pub struct BuildOptions {
+    /// Build using the release profile (`profile.release`)
+    ///
+    /// Conflicts with `--dev`.
+    #[arg(long, conflicts_with = "dev")]
     pub release: bool,
-    /// cross compile for a different target
+
+    /// Build using the development profile (`profile.dev`)
+    ///
+    /// Conflicts with `--release`.
     #[arg(long)]
-    pub target: Option<String>,
+    pub dev: bool,
 
+    /// Activate specific features for this build/run
+    ///
+    /// Overrides global features specified with `--features`.
     #[arg(long)]
-    pub discover_hidden: bool,
+    pub features: Option<Vec<String>>,
+
+    /// Build only the specified binary target
+    ///
+    /// Conflicts with `--lib`.
+    #[arg(long, conflicts_with = "lib")]
+    pub bin: Option<String>,
+
+    /// Build only the library target
+    #[arg(long)]
+    pub lib: bool,
+
+    /// Number of parallel compilation threads
+    #[arg(short = 'j')]
+    pub threads: Option<i32>,
 }
 
-impl ForgeOptions {
-    pub fn profile(&self) -> Option<Profile> {
-        if self.release {
-            Some(Profile::Release)
-        } else if self.debug {
-            Some(Profile::Debug)
-        } else {
-            None
-        }
-    }
-    pub fn target(&self) -> Option<&String> {
-        self.target.as_ref()
-    }
-    pub fn discover_hidden(&self) -> bool {
-        self.discover_hidden
-    }
-}
-
-impl ForgeArgs {
-    pub fn profile(&self) -> Option<Profile> {
-        match &self.command {
-            Command::Build { opts } => opts.profile(),
-            Command::Rebuild { opts } => opts.profile(),
-            Command::Run { opts, .. } => opts.profile(),
-            _ => None,
-        }
-    }
-    pub fn target(&self) -> Option<&String> {
-        match &self.command {
-            Command::Build { opts } => opts.target.as_ref(),
-            Command::Rebuild { opts } => opts.target.as_ref(),
-            Command::Run { opts, .. } => opts.target.as_ref(),
-            _ => None,
-        }
-    }
-    pub fn discover_hidden(&self) -> bool {
-        match &self.command {
-            Command::Build { opts } => opts.discover_hidden(),
-            Command::Rebuild { opts } => opts.discover_hidden(),
-            Command::Run { opts, .. } => opts.discover_hidden(),
-            _ => false,
-        }
-    }
-}

@@ -1,9 +1,0 @@
-dependencies = []
-
-[project]
-name = "broken_project"
-version = "0.1.0"
-
-[build]
-ignore_patterns = []
-link_targets = []

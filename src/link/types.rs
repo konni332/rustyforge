@@ -15,3 +15,10 @@ pub struct LinkUnit<'a> {
 pub struct LinkOptions {
     pub target: Option<String>,
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct LinkingResult {
+    pub exe_path: Option<PathBuf>,
+    pub static_lib: Option<PathBuf>,
+    pub shared_lid: Option<PathBuf>,
+}

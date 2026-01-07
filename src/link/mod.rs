@@ -15,6 +15,7 @@ pub use clang::ClangLinker;
 pub use driver::LinkerDirver;
 pub use gcc::GccLinker;
 pub use msvc::MsvcLinker;
+pub use types::LinkingResult;
 
 pub trait Linker {
     fn new() -> Self;

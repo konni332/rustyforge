@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use anyhow::{Context, Result};
 
 use crate::{
@@ -14,7 +12,7 @@ use crate::{
         create_profile_dir, initialize_filestructure, load_project_config, load_tool_config,
         remove_file_structure, remove_target_dir,
     },
-    link::{ClangLinker, GccLinker, LinkerDirver, MsvcLinker},
+    link::{ClangLinker, GccLinker, LinkerDirver, LinkingResult, MsvcLinker},
     ui,
     utils::resolve_compiler,
 };
@@ -93,7 +91,7 @@ fn execute_build(
     opts: &ForgeOptions,
     project_config: &ProjectConfig,
     tool_config: &ToolConfig,
-) -> Result<Option<PathBuf>> {
+) -> Result<LinkingResult> {
     run_prebuild_commands(
         project_config
             .build
@@ -158,7 +156,7 @@ fn run_prebuild_commands(cmds: &[String]) -> Result<()> {
         let args = &parts[1..];
         let mut c = std::process::Command::new(exe);
         c.args(args);
-        println!("{}", ui::running_prebuild_command_msg(&c));
+        println!("{}", ui::running_command_msg(&c));
         let status = c.status().context("Failed to execute pre-build command")?;
 
         match status.code() {
@@ -177,8 +175,10 @@ fn execute_run(
     tool_config: &ToolConfig,
 ) -> Result<()> {
     let exe_path = execute_build(args, opts, project_config, tool_config)?
+        .exe_path
         .context("Can only run executable. Try adding executable linker target")?;
     let mut cmd = std::process::Command::new(exe_path);
+    println!("{}", ui::running_command_msg(&cmd));
     let status = cmd.args(program_args).status()?;
     match status.code() {
         Some(code) => println!("{}", ui::run_exit_code_msg(code)),

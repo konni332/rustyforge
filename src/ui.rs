@@ -4,7 +4,8 @@ use verbosio::get_verbosity;
 
 use crate::{config::project::LinkTargetKind, utils::format_duration};
 
-pub fn successfull_compile_msg(file_path: &Path, cmd: &Command) -> String {
+pub fn successfull_compile_msg(file_path: &Path, cmd: &Command, warnings: &[u8]) -> String {
+    let warnings = String::from_utf8_lossy(warnings);
     let verbosity = verbosio::get_verbosity!();
     let path = if verbosity > 1 {
         file_path.to_string_lossy()
@@ -16,17 +17,25 @@ pub fn successfull_compile_msg(file_path: &Path, cmd: &Command) -> String {
     };
     #[cfg(feature = "term-colors")]
     {
-        let mut msg = format!("{} {}", "Compiled".bold().green(), path);
+        let mut msg = format!("{} [{}]\n", "Compiled".bold().green(), path);
         if verbosity > 0 {
-            msg.push_str(&format!(": {}", display_command(cmd)));
+            msg.push_str(&format!(": {}\n", display_command(cmd)));
+        }
+        if !warnings.is_empty() {
+            msg.push_str(&warnings);
+            msg.push('\n');
         }
         msg
     }
     #[cfg(not(feature = "term-colors"))]
     {
-        let mut msg = format!("{} [{}]", "Compiled", path);
+        let mut msg = format!("{} [{}]\n", "Compiled", path);
         if verbosity > 0 {
-            msg.push_str(&format!(": {}", display_command(cmd)));
+            msg.push_str(&format!(": {}\n", display_command(cmd)));
+        }
+        if !warnings.is_empty() {
+            msg.push_str(&warnings);
+            msg.push('\n');
         }
         msg
     }
@@ -221,25 +230,26 @@ fn shell_escape(s: &std::ffi::OsStr) -> String {
 
 pub fn display_command(cmd: &Command) -> String {
     let program = shell_escape(cmd.get_program());
+    if get_verbosity!() > 1 {
+        let args = cmd
+            .get_args()
+            .map(shell_escape)
+            .collect::<Vec<_>>()
+            .join(" ");
 
-    let args = cmd
-        .get_args()
-        .map(shell_escape)
-        .collect::<Vec<_>>()
-        .join(" ");
-
-    format!("{program} {args}")
+        format!("{program} {args}")
+    } else {
+        program
+    }
 }
 
-pub fn running_prebuild_command_msg(cmd: &Command) -> String {
+pub fn running_command_msg(cmd: &Command) -> String {
     #[cfg(feature = "term-colors")]
-    let mut msg = format!("{} prebuild command:", "Running".bold().green());
+    let mut msg = format!("{} ", "Running".bold().green());
     #[cfg(not(feature = "term-colors"))]
-    let mut msg = format!("Running prebuild command:");
+    let mut msg = format!("Running ");
 
-    if get_verbosity!() > 0 {
-        msg.push_str(&format!("  {}", display_command(cmd)));
-    }
+    msg.push_str(&format!("  {}", display_command(cmd)));
     msg
 }
 

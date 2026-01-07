@@ -11,7 +11,7 @@ use crate::{
     fs::{object_dir, profile_dir},
     link::{
         Linker,
-        types::{LinkOptions, LinkUnit},
+        types::{LinkOptions, LinkUnit, LinkingResult},
     },
     ui::{self},
 };
@@ -153,7 +153,7 @@ impl<'a, L: Linker + Sync> LinkerDirver<'a, L> {
 
         Ok(output_path)
     }
-    pub fn link(&self) -> anyhow::Result<Option<PathBuf>> {
+    pub fn link(&self) -> anyhow::Result<LinkingResult> {
         let targets = if self
             .project_config
             .build
@@ -201,14 +201,16 @@ impl<'a, L: Linker + Sync> LinkerDirver<'a, L> {
 
         total_pb.finish_and_clear();
         let mut failed = false;
-        let mut executable_path = None;
+        let mut linking_result = LinkingResult::default();
         for (link_target, res) in results {
             if res.is_err() {
                 failed = true;
-            } else if let Ok(path) = res
-                && link_target.kind == LinkTargetKind::Executable
-            {
-                executable_path = Some(path);
+            } else if let Ok(path) = res {
+                match &link_target.kind {
+                    LinkTargetKind::Executable => linking_result.exe_path = Some(path),
+                    LinkTargetKind::StaticLibrary => linking_result.static_lib = Some(path),
+                    LinkTargetKind::SharedLibrary => linking_result.shared_lid = Some(path),
+                }
             }
         }
 
@@ -217,6 +219,6 @@ impl<'a, L: Linker + Sync> LinkerDirver<'a, L> {
         } else {
             println!("{}", ui::finished_linking_msg(total_pb.elapsed()));
         }
-        Ok(executable_path)
+        Ok(linking_result)
     }
 }

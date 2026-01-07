@@ -1,4 +1,5 @@
 use std::{
+    cmp,
     collections::HashMap,
     hash::{Hash, Hasher},
     path::{Path, PathBuf},
@@ -138,8 +139,9 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
         })
     }
     fn discover_files(&self) -> Result<Vec<PathBuf>> {
+        let cwd = std::env::current_dir()?;
         let mut files = vec![];
-        for entry in jwalk::WalkDir::new(".")
+        for entry in jwalk::WalkDir::new(cwd)
             .skip_hidden(true)
             .process_read_dir(|depth, _path, _state, entries| {
                 if let Some(depth) = depth
@@ -160,7 +162,7 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
                 && !self.should_be_ignored(&path)
             {
                 if get_verbosity!() > 0 {
-                    discovered_file_msg(&path);
+                    println!("{}", discovered_file_msg(&path));
                 }
                 files.push(path.to_path_buf());
             }
@@ -168,9 +170,10 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
         Ok(files)
     }
     fn discover_include_dirs(&self) -> Result<Vec<PathBuf>> {
+        let cwd = std::env::current_dir()?;
         let mut dirs = HashMap::<PathBuf, ()>::new();
 
-        for entry in jwalk::WalkDir::new(".")
+        for entry in jwalk::WalkDir::new(&cwd)
             .skip_hidden(true)
             .process_read_dir(|depth, _path, _state, entries| {
                 if let Some(depth) = depth
@@ -178,7 +181,7 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
                 {
                     for entry in entries.iter_mut().flatten() {
                         if entry.path().join("RustyForge.toml").is_file() {
-                            entry.read_children_path = None; // Unterbaum ignorieren
+                            entry.read_children_path = None;
                         }
                     }
                 }
@@ -197,15 +200,20 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
                     }
 
                     if get_verbosity!() > 0 {
-                        discovered_dir_msg(parent);
+                        println!("{}", discovered_dir_msg(parent));
                     }
-
+                    if let Some(cur) = current
+                        && cur == cwd
+                    {
+                        break;
+                    }
                     current = parent.parent();
                 }
             }
         }
-
-        Ok(dirs.into_keys().collect())
+        let mut dirs = dirs.into_keys().collect();
+        normalize_include_directories(&mut dirs);
+        Ok(dirs)
     }
     fn should_be_ignored(&self, path: &Path) -> bool {
         self.ignore_set.is_match(path)
@@ -303,7 +311,8 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
                 };
 
                 if output.status.success() {
-                    let msg = ui::successfull_compile_msg(&path, &cmd);
+                    let warnings = &output.stderr;
+                    let msg = ui::successfull_compile_msg(&path, &cmd, warnings);
                     pb.println(msg);
                     pb.inc(1);
                     Some((hash, path))
@@ -332,8 +341,59 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
     }
 }
 
+pub fn normalize_include_directories(dirs: &mut Vec<PathBuf>) {
+    dirs.retain(|p| p.is_dir() && p.exists());
+
+    dirs.sort_by(|a, b| {
+        let len_cmp = a.components().count().cmp(&b.components().count());
+        if len_cmp != cmp::Ordering::Equal {
+            len_cmp
+        } else {
+            a.as_os_str().cmp(b.as_os_str())
+        }
+    });
+}
+
 impl<C: Compiler + Sync> Drop for CompilerDriver<C> {
     fn drop(&mut self) {
         self.cache.save_cache().ok();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_sorting_of_include_directories() {
+        let tmp = tempdir().unwrap();
+
+        let dir1 = tmp.path().join("very_long_include");
+        let dir2 = tmp.path().join("vendor");
+        let subdir1 = dir1.join("api");
+        let subdir2 = dir2.join("api");
+        let subsubdir = subdir1.join("foo");
+
+        fs::create_dir_all(&dir1).unwrap();
+        fs::create_dir_all(&dir2).unwrap();
+        fs::create_dir_all(&subdir1).unwrap();
+        fs::create_dir_all(&subdir2).unwrap();
+        fs::create_dir_all(&subsubdir).unwrap();
+
+        let mut dirs = vec![
+            dir1.clone(),
+            dir2.clone(),
+            subdir1.clone(),
+            subdir2.clone(),
+            subsubdir.clone(),
+        ];
+
+        normalize_include_directories(&mut dirs);
+
+        let expected = vec![dir2, dir1, subdir2, subdir1, subsubdir];
+
+        assert_eq!(dirs, expected);
     }
 }

@@ -1,0 +1,12 @@
+dependencies = []
+
+[project]
+name = "include-discovery"
+version = "0.1.0"
+
+[build]
+ignore_patterns = []
+
+[[build.link_target]]
+name = "include_dicovery"
+kind = "executable"

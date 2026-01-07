@@ -1,4 +1,4 @@
-/target/
+**/target/
 /**/*.rs.bk
 **/*.rs.bk
 
@@ -15,6 +15,5 @@
 **/sds/**
 **/curl/**
 
-**/RustyForge.toml
 **/.rustyforge/**
 **/target/**

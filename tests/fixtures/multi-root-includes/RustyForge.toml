@@ -1,0 +1,12 @@
+dependencies = []
+
+[project]
+name = "multi-root-includes"
+version = "0.1.0"
+
+[build]
+ignore_patterns = []
+
+[[build.link_target]]
+name = "multi-root-includes"
+kind = "executable"

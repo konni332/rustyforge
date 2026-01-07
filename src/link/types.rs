@@ -1,12 +1,14 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::config::project::LinkTargetKind;
 
 pub struct LinkUnit<'a> {
     pub kind: LinkTargetKind,
     pub objects: &'a [PathBuf],
-    pub output: PathBuf,
+    pub output: &'a Path,
     pub user_flags: &'a [String],
+
+    pub soname: &'a Option<String>,
 
     pub lib_dirs: Vec<PathBuf>,
     pub libs: Vec<String>,

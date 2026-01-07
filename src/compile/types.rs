@@ -8,6 +8,7 @@ pub struct CompileUnit<'a> {
     pub source: &'a Path,
     pub includes: &'a [PathBuf],
     pub defines: &'a [String],
+    pub is_shared: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -17,6 +18,7 @@ pub struct CompileOptions {
     pub user_flags: Vec<String>,
     pub defines: Vec<String>,
     pub target: Option<String>,
+    pub discover_hidden: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

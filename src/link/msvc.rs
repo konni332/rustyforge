@@ -1,4 +1,4 @@
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 
 use crate::{
     compile::types::{CannonicalCommand, CannonicalCommandBuilder},
@@ -50,7 +50,7 @@ impl MsvcLinker {
             cmd.arg(obj);
         }
 
-        cmd.arg("/OUT:").arg(&unit.output);
+        cmd.arg("/OUT:").arg(unit.output);
 
         for dir in &unit.lib_dirs {
             cmd.arg(format!("/LIBPATH:{}", dir.display()));
@@ -84,8 +84,17 @@ impl MsvcLinker {
             cmd.arg(obj);
         }
 
+        cmd.args(unit.user_flags);
+
         cmd.arg("/DLL");
         cmd.arg(format!("/OUT:{}", unit.output.display()));
+        cmd.arg(format!(
+            "/IMPLIB:{}.lib",
+            unit.output
+                .file_stem()
+                .context("Failed to determine import library name")?
+                .display()
+        ));
 
         for dir in &unit.lib_dirs {
             cmd.arg(format!("/LIBPATH:{}", dir.display()));
@@ -94,8 +103,6 @@ impl MsvcLinker {
         for lib in &unit.libs {
             cmd.arg(format!("{}.lib", lib));
         }
-
-        cmd.args(unit.user_flags);
 
         Ok(cmd.finish())
     }

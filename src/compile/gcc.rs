@@ -36,6 +36,10 @@ impl Compiler for Gcc {
 
         cmd.arg("-c").arg(unit.source).arg("-o").arg(output);
 
+        if unit.is_shared {
+            cmd.arg("-fPIC");
+        }
+
         cmd.args(Self::profile_flags(opts.profile));
 
         if let Some(target) = &opts.target {

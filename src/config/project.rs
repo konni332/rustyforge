@@ -38,6 +38,7 @@ pub struct LinkTarget {
     pub name: String,
     pub user_flags: Option<Vec<String>>,
     pub kind: LinkTargetKind,
+    pub soname: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]

@@ -21,7 +21,7 @@ use crate::{
         Compiler,
         types::{CannonicalCommand, CompileOptions, CompileUnit, Profile},
     },
-    config::project::ProjectConfig,
+    config::project::{LinkTargetKind, ProjectConfig},
     fs::{build_cache_path, debug_dir, object_dir, release_dir},
     ui::{self, discovered_dir_msg, discovered_file_msg},
 };
@@ -31,6 +31,7 @@ pub struct CompilerDriver<C: Compiler + Sync> {
     pub ignore_set: GlobSet,
     pub opts: CompileOptions,
     cache: BuildCache,
+    link_target_kinds: Vec<LinkTargetKind>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -68,8 +69,18 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
             Profile::Debug => debug_dir(root),
             Profile::Release => release_dir(root),
         };
+
+        let link_target_kinds = project_config
+            .build
+            .link_target
+            .as_ref()
+            .map(|v| v.iter().map(|t| t.kind).collect())
+            .unwrap_or(vec![LinkTargetKind::Executable]);
+
         let object_dir = object_dir(profile_dir);
-        std::fs::create_dir_all(&object_dir)?;
+        create_object_dirs(&link_target_kinds, &object_dir)
+            .context("Failed to create object file directories")?;
+
         let ignore_pattern_strings = &project_config.build.ignore_patterns;
         let user_flags = match profile {
             Profile::Debug => project_config
@@ -101,24 +112,22 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
         };
 
         let target = args.target();
-        Self::new(
-            C::new(),
-            object_dir,
-            ignore_pattern_strings,
+
+        let options = CompileOptions {
             profile,
+            object_dir,
             user_flags,
+            target: target.cloned(),
+            discover_hidden: args.discover_hidden(),
             defines,
-            target.cloned(),
-        )
+        };
+
+        Self::new(ignore_pattern_strings, link_target_kinds, options)
     }
     pub fn new(
-        compiler: C,
-        object_dir: PathBuf,
         ignore_pattern_strings: &[String],
-        profile: Profile,
-        user_flags: Vec<String>,
-        defines: Vec<String>,
-        target: Option<String>,
+        link_target_kinds: Vec<LinkTargetKind>,
+        options: CompileOptions,
     ) -> Result<Self> {
         let mut builder = GlobSetBuilder::new();
         for pat in ignore_pattern_strings {
@@ -126,23 +135,18 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
         }
         let ignore_set = builder.build()?;
         Ok(Self {
-            compiler,
+            compiler: C::new(),
             ignore_set,
-            opts: CompileOptions {
-                profile,
-                object_dir,
-                user_flags,
-                target,
-                defines,
-            },
+            opts: options,
             cache: BuildCache::load_cache()?,
+            link_target_kinds,
         })
     }
     fn discover_files(&self) -> Result<Vec<PathBuf>> {
         let cwd = std::env::current_dir()?;
         let mut files = vec![];
         for entry in jwalk::WalkDir::new(cwd)
-            .skip_hidden(true)
+            .skip_hidden(!self.opts.discover_hidden)
             .process_read_dir(|depth, _path, _state, entries| {
                 if let Some(depth) = depth
                     && depth >= 1
@@ -174,7 +178,7 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
         let mut dirs = HashMap::<PathBuf, ()>::new();
 
         for entry in jwalk::WalkDir::new(&cwd)
-            .skip_hidden(true)
+            .skip_hidden(!self.opts.discover_hidden)
             .process_read_dir(|depth, _path, _state, entries| {
                 if let Some(depth) = depth
                     && depth >= 1
@@ -251,35 +255,80 @@ impl<C: Compiler + Sync> CompilerDriver<C> {
         includes.sort();
         let mut defines = self.opts.defines.clone();
         defines.sort();
-        let cmds: Result<Vec<(PathBuf, u64, std::process::Command)>> = files
-            .into_par_iter()
-            .map(|file| {
-                let unit = CompileUnit {
-                    source: &file,
-                    includes: &includes,
-                    defines: &defines,
-                };
-                let mut deps = self.compiler.get_dependencies(&unit)?;
+        let mut compile_commands = vec![];
 
-                deps.retain(|pb| !self.should_be_ignored(pb));
-                deps.sort();
-                let cmd = self.compiler.compile_cmd(&unit, &self.opts)?;
-                let hash = self.compute_command_hash(&cmd, &file, &deps)?;
-                if self.cache.map.get(&hash).is_some_and(|p| *p == file) {
-                    return Ok(None);
-                }
+        if self.link_target_kinds.contains(&LinkTargetKind::Executable)
+            || self
+                .link_target_kinds
+                .contains(&LinkTargetKind::StaticLibrary)
+        {
+            let cmds: Result<Vec<(PathBuf, u64, std::process::Command)>> = files
+                .clone()
+                .into_par_iter()
+                .map(|file| {
+                    let unit = CompileUnit {
+                        source: &file,
+                        includes: &includes,
+                        defines: &defines,
+                        is_shared: false,
+                    };
+                    let mut deps = self.compiler.get_dependencies(&unit)?;
 
-                Ok(Some((file.to_path_buf(), hash, Command::from(&cmd))))
-            })
-            .filter_map(|res| match res {
-                Ok(Some(v)) => Some(Ok(v)),
-                Ok(None) => None,
-                Err(e) => Some(Err(e)),
-            })
-            .collect();
-        let cmds = cmds?;
+                    deps.retain(|pb| !self.should_be_ignored(pb));
+                    deps.sort();
+                    let cmd = self.compiler.compile_cmd(&unit, &self.opts)?;
+                    let hash = self.compute_command_hash(&cmd, &file, &deps)?;
+                    if self.cache.map.get(&hash).is_some_and(|p| *p == file) {
+                        return Ok(None);
+                    }
 
-        Ok(cmds)
+                    Ok(Some((file.to_path_buf(), hash, Command::from(&cmd))))
+                })
+                .filter_map(|res| match res {
+                    Ok(Some(v)) => Some(Ok(v)),
+                    Ok(None) => None,
+                    Err(e) => Some(Err(e)),
+                })
+                .collect();
+            compile_commands.extend(cmds?);
+        }
+
+        if self
+            .link_target_kinds
+            .contains(&LinkTargetKind::SharedLibrary)
+        {
+            let mut shared_opts = self.opts.clone();
+            shared_opts.object_dir = self.opts.object_dir.join("shared");
+            let cmds: Result<Vec<(PathBuf, u64, std::process::Command)>> = files
+                .into_par_iter()
+                .map(|file| {
+                    let unit = CompileUnit {
+                        source: &file,
+                        includes: &includes,
+                        defines: &defines,
+                        is_shared: true,
+                    };
+                    let mut deps = self.compiler.get_dependencies(&unit)?;
+
+                    deps.retain(|pb| !self.should_be_ignored(pb));
+                    deps.sort();
+                    let cmd = self.compiler.compile_cmd(&unit, &shared_opts)?;
+                    let hash = self.compute_command_hash(&cmd, &file, &deps)?;
+                    if self.cache.map.get(&hash).is_some_and(|p| *p == file) {
+                        return Ok(None);
+                    }
+
+                    Ok(Some((file.to_path_buf(), hash, Command::from(&cmd))))
+                })
+                .filter_map(|res| match res {
+                    Ok(Some(v)) => Some(Ok(v)),
+                    Ok(None) => None,
+                    Err(e) => Some(Err(e)),
+                })
+                .collect();
+            compile_commands.extend(cmds?);
+        }
+        Ok(compile_commands)
     }
 
     pub fn compile_incremental(&mut self) -> Result<()> {
@@ -352,6 +401,19 @@ pub fn normalize_include_directories(dirs: &mut Vec<PathBuf>) {
             a.as_os_str().cmp(b.as_os_str())
         }
     });
+}
+
+pub fn create_object_dirs(
+    link_target_kinds: &[LinkTargetKind],
+    base_object_dir: &Path,
+) -> Result<()> {
+    let dir = if link_target_kinds.contains(&LinkTargetKind::SharedLibrary) {
+        base_object_dir.join("shared/")
+    } else {
+        base_object_dir.to_path_buf()
+    };
+    std::fs::create_dir_all(&dir)?;
+    Ok(())
 }
 
 impl<C: Compiler + Sync> Drop for CompilerDriver<C> {

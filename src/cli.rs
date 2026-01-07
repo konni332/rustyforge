@@ -65,6 +65,9 @@ pub struct ForgeOptions {
     /// cross compile for a different target
     #[arg(long)]
     pub target: Option<String>,
+
+    #[arg(long)]
+    pub discover_hidden: bool,
 }
 
 impl ForgeOptions {
@@ -79,6 +82,9 @@ impl ForgeOptions {
     }
     pub fn target(&self) -> Option<&String> {
         self.target.as_ref()
+    }
+    pub fn discover_hidden(&self) -> bool {
+        self.discover_hidden
     }
 }
 
@@ -97,6 +103,14 @@ impl ForgeArgs {
             Command::Rebuild { opts } => opts.target.as_ref(),
             Command::Run { opts, .. } => opts.target.as_ref(),
             _ => None,
+        }
+    }
+    pub fn discover_hidden(&self) -> bool {
+        match &self.command {
+            Command::Build { opts } => opts.discover_hidden(),
+            Command::Rebuild { opts } => opts.discover_hidden(),
+            Command::Run { opts, .. } => opts.discover_hidden(),
+            _ => false,
         }
     }
 }

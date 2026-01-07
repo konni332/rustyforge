@@ -42,6 +42,10 @@ impl Compiler for Msvc {
             cmd.arg("/I").arg(include);
         }
 
+        if unit.is_shared {
+            cmd.arg("/D").arg("BUILDING_MYLIB");
+        }
+
         for define in unit.defines {
             cmd.arg("/D").arg(define);
         }

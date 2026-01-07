@@ -126,6 +126,10 @@ pub fn object_dir<P: AsRef<Path>>(profile_dir: P) -> PathBuf {
     profile_dir.as_ref().join("object/")
 }
 
+pub fn shared_object_dir<P: AsRef<Path>>(profile_dir: P) -> PathBuf {
+    object_dir(profile_dir).join("shared/")
+}
+
 pub fn build_cache_path<P: AsRef<Path>>(root: P) -> PathBuf {
     target_dir(root).join("build.cache")
 }

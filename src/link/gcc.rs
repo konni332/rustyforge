@@ -40,7 +40,7 @@ impl Linker for GccLinker {
         match unit.kind {
             LinkTargetKind::Executable => self.link_executable(unit, opts),
             LinkTargetKind::StaticLibrary => self.link_static_lib(unit),
-            LinkTargetKind::SharedLibrary => self.link_shared_lib(unit),
+            LinkTargetKind::SharedLibrary => self.link_shared_lib(unit, opts),
         }
     }
 }
@@ -65,7 +65,7 @@ impl GccLinker {
             cmd.arg(format!("-l{}", lib));
         }
 
-        cmd.arg("-o").arg(&unit.output);
+        cmd.arg("-o").arg(unit.output);
         cmd.args(unit.user_flags);
 
         Ok(cmd.finish())
@@ -74,7 +74,7 @@ impl GccLinker {
         let mut cmd = CannonicalCommandBuilder::new("ar");
 
         cmd.arg("rcs");
-        cmd.arg(&unit.output);
+        cmd.arg(unit.output);
 
         for obj in unit.objects {
             cmd.arg(obj);
@@ -84,7 +84,35 @@ impl GccLinker {
 
         Ok(cmd.finish())
     }
-    fn link_shared_lib(&self, _unit: &LinkUnit) -> Result<CannonicalCommand> {
-        unimplemented!()
+    fn link_shared_lib(&self, unit: &LinkUnit, opts: &LinkOptions) -> Result<CannonicalCommand> {
+        let mut cmd = CannonicalCommandBuilder::new("gcc");
+
+        if let Some(target) = &opts.target {
+            cmd.arg("--target").arg(target);
+        }
+
+        cmd.arg("-shared");
+        cmd.arg("-fPIC");
+
+        for obj in unit.objects {
+            cmd.arg(obj);
+        }
+
+        for dir in &unit.lib_dirs {
+            cmd.arg("-L").arg(dir);
+        }
+
+        for lib in &unit.libs {
+            cmd.arg(format!("-l{}", lib));
+        }
+
+        if let Some(soname) = &unit.soname {
+            cmd.arg("-Wl,-soname,").arg(soname);
+        }
+
+        cmd.arg("-o").arg(unit.output);
+        cmd.args(unit.user_flags);
+
+        Ok(cmd.finish())
     }
 }

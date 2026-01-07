@@ -8,7 +8,7 @@ use crate::{
     ForgeArgs,
     compile::types::Profile,
     config::project::{LinkTarget, LinkTargetKind, ProjectConfig},
-    fs::{object_dir, profile_dir},
+    fs::{object_dir, profile_dir, shared_object_dir},
     link::{
         Linker,
         types::{LinkOptions, LinkUnit, LinkingResult},
@@ -21,6 +21,7 @@ pub struct LinkerDirver<'a, L: Linker + Sync> {
     pub opts: LinkOptions,
     pub project_config: &'a ProjectConfig,
     pub objects: Vec<PathBuf>,
+    pub shared_objects: Vec<PathBuf>,
     pub profile: Profile,
 }
 
@@ -38,13 +39,24 @@ impl<'a, L: Linker + Sync> LinkerDirver<'a, L> {
         };
         let linker = L::new();
         let objects = Self::discover_objects(profile)?;
+        let shared_objects = Self::discover_shared_objects(profile)?;
         Ok(Self {
             profile,
             linker,
             objects,
+            shared_objects,
             opts,
             project_config,
         })
+    }
+    pub fn discover_shared_objects(profile: Profile) -> Result<Vec<PathBuf>> {
+        let obj_dir = shared_object_dir(profile_dir(profile)?);
+        Ok(jwalk::WalkDir::new(obj_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().and_then(|e| e.to_str()) == Some("o"))
+            .map(|e| e.path().to_path_buf())
+            .collect())
     }
     pub fn discover_objects(profile: Profile) -> Result<Vec<PathBuf>> {
         let obj_dir = object_dir(profile_dir(profile)?);
@@ -114,13 +126,18 @@ impl<'a, L: Linker + Sync> LinkerDirver<'a, L> {
         }
 
         let user_flags = &link_target.user_flags.clone().unwrap_or(vec![]);
+        let objects = match link_target.kind {
+            LinkTargetKind::SharedLibrary => &self.shared_objects,
+            _ => &self.objects,
+        };
         let unit = LinkUnit {
             user_flags,
             kind: link_target.kind,
-            objects: &self.objects,
-            output: output_path.clone(),
+            objects,
+            output: &output_path,
             lib_dirs,
             libs,
+            soname: &link_target.soname,
         };
         let cannonical = match self.linker.link_cmd(&unit, &self.opts) {
             Ok(c) => c,
@@ -167,6 +184,7 @@ impl<'a, L: Linker + Sync> LinkerDirver<'a, L> {
                 name: self.project_config.project.name.clone(),
                 kind: LinkTargetKind::Executable,
                 user_flags: None,
+                soname: None,
             }]
         };
 

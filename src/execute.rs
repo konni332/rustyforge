@@ -1,0 +1,66 @@
+use rustyforge_core::{
+    CoreError, CoreResult, RunTimeConfig, get_project_info_string, internal_error,
+    manifest::Manifest,
+};
+
+/// Initializes RustyForge project in the current directory
+pub fn initialize_new_rustyforge() -> CoreResult<()> {
+    match std::env::current_dir()?
+        .file_name()
+        .and_then(|s| s.to_str())
+    {
+        Some(name) => Manifest::write_new(name),
+        None => Manifest::write_default(),
+    }?;
+    Ok(())
+}
+
+/// Creates an new RustyForge project
+pub fn create_new_rustyforge(name: &str, bin: bool, lib: bool) -> CoreResult<()> {
+    let old_cwd = std::env::current_dir()?;
+    let project_dir = old_cwd.join(name);
+    std::fs::create_dir_all(&project_dir)?;
+    std::env::set_current_dir(project_dir)?;
+
+    if bin {
+        Manifest::write_bin_template(name)?;
+    } else if lib {
+        Manifest::write_lib_template(name)?;
+    } else {
+        Manifest::write_new(name)?;
+    }
+
+    std::env::set_current_dir(old_cwd)?;
+    Ok(())
+}
+
+pub fn project_info(runtime_config: &RunTimeConfig, json: bool) -> CoreResult<()> {
+    if json {
+        let str = match serde_json::to_string_pretty(runtime_config) {
+            Ok(s) => s,
+            Err(e) => {
+                // NOTE: The Runtime config layout is static and known. If it fails there is a
+                // serious Bug in either our config or serde
+                internal_error!("Failed to serialize runtime config: {}", e);
+            }
+        };
+
+        todo!("use json string somehow: {}", str);
+    } else {
+        let info = match get_project_info_string(runtime_config) {
+            Ok(i) => i,
+            Err(boxed_err) => {
+                let error: CoreError = *boxed_err;
+                match error {
+                    CoreError::Fmt(e) => {
+                        internal_error!("{}", e);
+                    }
+                    other => return Err(Box::new(other)),
+                }
+            }
+        };
+        println!("{info}");
+    }
+
+    Ok(())
+}

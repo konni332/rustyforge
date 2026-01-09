@@ -1,6 +1,8 @@
+use std::num::NonZero;
+
 use clap::{Parser, Subcommand};
 
-use crate::RUSTYFORGE_VERSION;
+use crate::{CoreError, RUSTYFORGE_VERSION, error::CoreResult};
 
 /// RustyForge CLI
 ///
@@ -14,7 +16,7 @@ pub struct Cli {
     pub verbose: bool,
 
     /// Suppress output (quiet mode)
-    #[arg(long, short, global = true, conflicts_with = "info")]
+    #[arg(long, short, global = true)]
     pub quiet: bool,
 
     /// Activate features by name
@@ -61,6 +63,23 @@ pub enum CliCommand {
         #[arg(long)]
         json: bool,
     },
+
+    /// Initialize a new project in a new directory
+    New {
+        /// Name of the new project and the new directory
+        name: String,
+
+        /// Use the binary template, conlicts with `--lib`
+        #[arg(long, conflicts_with = "lib")]
+        bin: bool,
+
+        /// Use the library template (defaults static), conflicts with `--bin`
+        #[arg(long)]
+        lib: bool,
+    },
+
+    /// Initialize a new project in this directory
+    Init,
 }
 
 /// Options common to Build and Run commands
@@ -96,6 +115,72 @@ pub struct BuildOptions {
 
     /// Number of parallel compilation threads
     #[arg(short = 'j')]
-    pub threads: Option<i32>,
+    pub threads: Option<NonZero<usize>>,
 }
 
+impl Cli {
+    /// Parse and validate the command line arguments
+    ///
+    /// returns the Cli struct if the validation was successfull
+    /// Sets the verbosity level
+    pub fn create() -> CoreResult<Self> {
+        let cli = Cli::parse();
+
+        if cli.quiet && matches!(cli.command, CliCommand::Info { .. }) {
+            return Err(Box::new(CoreError::CliValidation(
+                "`--quiet` cannot be used together with the `info` subcommand".to_string(),
+            )));
+        };
+        verbosio::set_verbosity!(cli.get_verbosity());
+        Ok(cli)
+    }
+
+    pub fn get_verbosity(&self) -> u8 {
+        if self.verbose {
+            2
+        } else if self.quiet {
+            0
+        } else {
+            1
+        }
+    }
+
+    pub fn threads(&self) -> Option<NonZero<usize>> {
+        match &self.command {
+            CliCommand::Run { opts, .. } => opts.threads,
+            CliCommand::Build { opts } => opts.threads,
+            _ => None,
+        }
+    }
+
+    pub fn profile_name(&self) -> &'static str {
+        match &self.command {
+            CliCommand::Run { opts, .. } => opts.profile_name(),
+            CliCommand::Build { opts } => opts.profile_name(),
+            _ => "dev",
+        }
+    }
+    pub fn bin(&self) -> Option<&str> {
+        match &self.command {
+            CliCommand::Run { opts, .. } => opts.bin(),
+            CliCommand::Build { opts } => opts.bin(),
+            _ => None,
+        }
+    }
+    pub fn lib(&self) -> bool {
+        match &self.command {
+            CliCommand::Run { opts, .. } => opts.lib,
+            CliCommand::Build { opts } => opts.lib,
+            _ => false,
+        }
+    }
+}
+
+impl BuildOptions {
+    pub fn profile_name(&self) -> &'static str {
+        if self.release { "release" } else { "dev" }
+    }
+    pub fn bin(&self) -> Option<&str> {
+        self.bin.as_deref()
+    }
+}

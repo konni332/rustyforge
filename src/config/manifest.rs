@@ -5,6 +5,8 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+use crate::error::CoreResult;
+
 const DEFAULT_C_EDITION: &str = "c11";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -63,8 +65,8 @@ pub enum LibType {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Profiles {
-    dev: Option<Profile>,
-    release: Option<Profile>,
+    pub dev: Option<Profile>,
+    pub release: Option<Profile>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -121,5 +123,111 @@ impl Default for Package {
             description: None,
             repository: None,
         }
+    }
+}
+
+impl Profile {
+    pub fn default_dev() -> Self {
+        Self {
+            flags: None,
+            lto: Some(false),
+            opt_level: Some(0),
+            debug: Some(true),
+        }
+    }
+    pub fn default_release() -> Self {
+        Self {
+            flags: None,
+            lto: Some(true),
+            opt_level: Some(3),
+            debug: Some(false),
+        }
+    }
+}
+
+impl Manifest {
+    pub fn new(name: &str) -> Self {
+        Manifest {
+            package: Package::new(name),
+            build: Build::new(),
+            lib: None,
+            bin: None,
+            profile: None,
+            features: None,
+        }
+    }
+
+    pub fn bin_template(name: &str) -> Self {
+        Manifest {
+            package: Package::new(name),
+            build: Build::new(),
+            lib: None,
+            bin: Some(vec![Executable::new(name, PathBuf::from("src/main.c"))]),
+            profile: None,
+            features: None,
+        }
+    }
+
+    pub fn lib_template(name: &str) -> Self {
+        Manifest {
+            package: Package::new(name),
+            build: Build::new(),
+            lib: Some(Lib::new(name)),
+            bin: None,
+            profile: None,
+            features: None,
+        }
+    }
+
+    /// Reads and parses manifest from `current/directory/RustyForge.toml`
+    pub fn read_manifest() -> CoreResult<Self> {
+        let cwd = std::env::current_dir()?;
+        let manifest_path = cwd.join("RustyForge.toml");
+        if !manifest_path.exists() {
+            return Err(Box::new(crate::CoreError::ManifestNotFound));
+        }
+
+        let src = std::fs::read_to_string(&manifest_path)?;
+        let manifest: Manifest = match toml::from_str(&src) {
+            Ok(m) => m,
+            Err(e) => {
+                return Err(Box::new(crate::CoreError::InvalidManifest {
+                    path: manifest_path,
+                    src,
+                    span: e.span().unwrap_or_default(),
+                    msg: e.message().to_string(),
+                }));
+            }
+        };
+
+        Ok(manifest)
+    }
+    /// Writes Self::default() to `current/directory/RustyForge.toml`
+    pub fn write_default() -> CoreResult<()> {
+        let manifest = Self::default();
+        manifest.write_manifest()
+    }
+
+    /// Writes self to `current/directory/RustyForge.toml`
+    pub fn write_manifest(&self) -> CoreResult<()> {
+        let contents = toml::to_string_pretty(&self)?;
+        let path = std::env::current_dir()?.join("RustyForge.toml");
+        std::fs::write(path, contents)?;
+        Ok(())
+    }
+
+    pub fn write_new(name: &str) -> CoreResult<()> {
+        let manifest = Manifest::new(name);
+        manifest.write_manifest()
+    }
+
+    pub fn write_lib_template(name: &str) -> CoreResult<()> {
+        let manifest = Manifest::lib_template(name);
+        manifest.write_manifest()
+    }
+
+    pub fn write_bin_template(name: &str) -> CoreResult<()> {
+        let manifest = Manifest::bin_template(name);
+        manifest.write_manifest()
     }
 }

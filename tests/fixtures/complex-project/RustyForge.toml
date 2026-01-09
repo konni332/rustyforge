@@ -1,16 +1,12 @@
-dependencies = []
-
-[project]
+[package]
 name = "complex-project"
 version = "0.1.0"
+edition = "c11"
 
-[project.profile_debug]
-flags = ["-Wall", "-Wextra"]
-defines = ["DEBUG=1"]
-
-[project.profile_release]
-flags = ["-O3"]
-defines = ["NDEBUG=1"]
+[lib]
+name = "complex"
+type = "static"
 
 [build]
-ignore_patterns = []
+
+

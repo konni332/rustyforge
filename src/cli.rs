@@ -1,6 +1,7 @@
 use std::num::NonZero;
 
 use clap::{Parser, Subcommand};
+use clap_verbosity_flag::Verbosity;
 
 use crate::{CoreError, RUSTYFORGE_VERSION, error::CoreResult};
 
@@ -11,13 +12,8 @@ use crate::{CoreError, RUSTYFORGE_VERSION, error::CoreResult};
 #[derive(Debug, Clone, Parser)]
 #[command(version = RUSTYFORGE_VERSION)]
 pub struct Cli {
-    /// Enable verbose output
-    #[arg(long, short, conflicts_with = "quiet", global = true)]
-    pub verbose: bool,
-
-    /// Suppress output (quiet mode)
-    #[arg(long, short, global = true)]
-    pub quiet: bool,
+    #[command(flatten)]
+    verbose: Verbosity,
 
     /// Activate features by name
     ///
@@ -126,23 +122,16 @@ impl Cli {
     pub fn create() -> CoreResult<Self> {
         let cli = Cli::parse();
 
-        if cli.quiet && matches!(cli.command, CliCommand::Info { .. }) {
+        if cli.verbose.is_silent() && matches!(cli.command, CliCommand::Info { .. }) {
             return Err(Box::new(CoreError::CliValidation(
                 "`--quiet` cannot be used together with the `info` subcommand".to_string(),
             )));
         };
-        verbosio::set_verbosity!(cli.get_verbosity());
         Ok(cli)
     }
 
-    pub fn get_verbosity(&self) -> u8 {
-        if self.verbose {
-            2
-        } else if self.quiet {
-            0
-        } else {
-            1
-        }
+    pub fn get_verbosity(&self) -> Verbosity {
+        self.verbose
     }
 
     pub fn threads(&self) -> Option<NonZero<usize>> {

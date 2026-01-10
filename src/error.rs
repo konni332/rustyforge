@@ -46,6 +46,9 @@ pub enum CoreError {
 
     #[error("Postcard serialization error: {0}")]
     PostcardSerialization(#[from] postcard::Error),
+
+    #[error("Thread pool error: {0}")]
+    ThreadPool(#[from] rayon::ThreadPoolBuildError),
 }
 
 impl From<std::io::Error> for Box<CoreError> {
@@ -68,6 +71,12 @@ impl From<std::fmt::Error> for Box<CoreError> {
 
 impl From<postcard::Error> for Box<CoreError> {
     fn from(value: postcard::Error) -> Self {
+        Box::new(value.into())
+    }
+}
+
+impl From<rayon::ThreadPoolBuildError> for Box<CoreError> {
+    fn from(value: rayon::ThreadPoolBuildError) -> Self {
         Box::new(value.into())
     }
 }

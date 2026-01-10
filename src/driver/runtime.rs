@@ -177,7 +177,7 @@ fn resolve_targets<'a>(
 ) -> CoreResult<Vec<Target<'a>>> {
     let config_linker_flags = config.build.as_ref().and_then(|b| b.linker_flags.as_ref());
 
-    let mut targets = vec![];
+    let mut lib_target = None;
     if cli.bin().is_none()
         && let Some(lib) = &manifest.lib
     {
@@ -199,16 +199,16 @@ fn resolve_targets<'a>(
         };
 
         let defines = &lib.defines;
-        let lib_target = Target {
+        lib_target = Some(Target {
             name,
             kind,
             ignore,
             flags,
             defines,
-        };
-        targets.push(lib_target);
+        });
     }
 
+    let mut targets = vec![];
     if !cli.lib()
         && let Some(bins) = &manifest.bin
     {
@@ -219,6 +219,14 @@ fn resolve_targets<'a>(
             {
                 continue;
             }
+
+            if targets.iter().any(|t: &Target| t.name == bin.name) {
+                return Err(Box::new(CoreError::ManifestValidation {
+                    msg: format!("Multiple binaries named '{}' found", &bin.name),
+                    help: "Consider removing or renaming binary target(s)".into(),
+                }));
+            }
+
             let name = &bin.name;
             let kind = TargetKind::Executable { entry: &bin.entry };
             let ignore = &bin.ignore;
@@ -243,6 +251,10 @@ fn resolve_targets<'a>(
             };
             targets.push(bin_target);
         }
+    }
+
+    if let Some(lib) = lib_target {
+        targets.push(lib);
     }
     if targets.is_empty() {
         return Err(Box::new(CoreError::NoEligibleTarget));

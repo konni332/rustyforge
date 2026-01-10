@@ -38,6 +38,9 @@ pub enum CoreError {
         msg: String,
     },
 
+    #[error("Manifest validation error: {msg}")]
+    ManifestValidation { msg: String, help: String },
+
     #[error("Toml serialization error: {0}")]
     TomlSerialization(#[from] toml::ser::Error),
 

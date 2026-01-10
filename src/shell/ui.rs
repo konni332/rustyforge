@@ -103,7 +103,7 @@ macro_rules! info {
 #[macro_export]
 macro_rules! warn {
     ($status:expr) => {
-        with_shell(|sh| drop(sh.print($status, None, &$crate::shell::ui::WARN)))
+        $crate::with_shell(|sh| drop(sh.print($status, None, &$crate::shell::ui::WARN)))
     };
     ($status:expr, $message:expr) => {
         $crate::with_shell(|sh| drop(sh.print($status, Some($message), &$crate::shell::ui::WARN)))

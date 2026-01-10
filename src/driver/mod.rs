@@ -1,7 +1,9 @@
 mod cache;
+mod discovery;
 mod runtime;
 mod runtime_info;
 mod toolchain_resolve;
+
 use std::path::PathBuf;
 
 pub use runtime::RunTimeConfig;

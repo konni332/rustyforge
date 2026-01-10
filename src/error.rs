@@ -43,6 +43,9 @@ pub enum CoreError {
 
     #[error("Fmt error: {0}")]
     Fmt(#[from] std::fmt::Error),
+
+    #[error("Postcard serialization error: {0}")]
+    PostcardSerialization(#[from] postcard::Error),
 }
 
 impl From<std::io::Error> for Box<CoreError> {
@@ -59,6 +62,12 @@ impl From<toml::ser::Error> for Box<CoreError> {
 
 impl From<std::fmt::Error> for Box<CoreError> {
     fn from(value: std::fmt::Error) -> Self {
+        Box::new(value.into())
+    }
+}
+
+impl From<postcard::Error> for Box<CoreError> {
+    fn from(value: postcard::Error) -> Self {
         Box::new(value.into())
     }
 }

@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::{
     CoreResult,
@@ -17,6 +17,7 @@ pub trait CCompiler: Send + Sync {
         profile: &Profile,
         target: &Target,
     ) -> CoreResult<CannonicalCommand>;
+    fn get_dependencies(&self, src: &Path) -> CoreResult<Vec<PathBuf>>;
 }
 
 pub trait CppCompiler: Send + Sync {
@@ -28,6 +29,7 @@ pub trait CppCompiler: Send + Sync {
         profile: &Profile,
         target: &Target,
     ) -> CoreResult<CannonicalCommand>;
+    fn get_dependencies(&self, src: &Path) -> CoreResult<Vec<PathBuf>>;
 }
 
 pub trait Linker {

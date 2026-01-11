@@ -1,5 +1,7 @@
+use std::path::PathBuf;
+
 use crate::{
-    TargetKind,
+    CoreError, CoreResult, TargetKind,
     driver::{
         cannonical_command::CannonicalCommandBuilder,
         toolchain::{
@@ -7,7 +9,7 @@ use crate::{
             traits::{Archiver, CCompiler, CppCompiler, Linker},
         },
     },
-    internal_error,
+    internal_error, warn,
 };
 
 pub struct Clang;
@@ -17,6 +19,9 @@ fn clang_id() -> &'static str {
 }
 
 impl CCompiler for Clang {
+    fn get_dependencies(&self, src: &std::path::Path) -> CoreResult<Vec<PathBuf>> {
+        get_clang_dependencies(src, "clang")
+    }
     fn id(&self) -> &'static str {
         clang_id()
     }
@@ -33,7 +38,7 @@ impl CCompiler for Clang {
 
         let mut cmd = CannonicalCommandBuilder::new("clang");
 
-        cmd.arg("-c").arg(path).arg("-o").arg(&output);
+        cmd.arg("-c").arg(path).arg("-o").arg(output);
 
         let opt = profile.opt_level.clamp(0, 3);
         cmd.arg(format!("-O{}", opt));
@@ -71,6 +76,9 @@ impl CCompiler for Clang {
 }
 
 impl CppCompiler for Clang {
+    fn get_dependencies(&self, src: &std::path::Path) -> CoreResult<Vec<PathBuf>> {
+        get_clang_dependencies(src, "clang++")
+    }
     fn id(&self) -> &'static str {
         clang_id()
     }
@@ -137,4 +145,48 @@ impl Archiver for Clang {
     fn id(&self) -> &'static str {
         clang_id()
     }
+}
+
+fn get_clang_dependencies(src: &std::path::Path, exe: &str) -> CoreResult<Vec<std::path::PathBuf>> {
+    use std::io::{self, BufRead};
+    use std::process::Command;
+
+    let output = Command::new(exe).arg("-MM").arg(src).output()?;
+
+    if !output.status.success() {
+        return Err(Box::new(CoreError::ResolveDependency {
+            path: src.to_path_buf(),
+            err: String::from_utf8_lossy(&output.stderr).to_string(),
+        }));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let mut deps = Vec::new();
+    for line in stdout.lines() {
+        let line = line.trim_end_matches('\\').trim();
+        if let Some(pos) = line.find(':') {
+            let files = &line[pos + 1..];
+            deps.extend(
+                files
+                    .split_whitespace()
+                    .map(|s| {
+                        let path = PathBuf::from(s);
+                        match path.canonicalize() {
+                            Ok(p) => Ok(p),
+                            Err(e) => {
+                                warn!(&format!(
+                                    "Failed to cannonicalize dependency path: {}",
+                                    path.display()
+                                ));
+                                Err(e)
+                            }
+                        }
+                    })
+                    .filter_map(|res| res.ok()),
+            );
+        }
+    }
+
+    Ok(deps)
 }

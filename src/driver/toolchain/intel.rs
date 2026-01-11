@@ -1,5 +1,7 @@
+use std::path::PathBuf;
+
 use crate::{
-    TargetKind,
+    CoreError, CoreResult, TargetKind,
     driver::{
         cannonical_command::CannonicalCommandBuilder,
         toolchain::{
@@ -7,7 +9,7 @@ use crate::{
             traits::{CCompiler, CppCompiler},
         },
     },
-    internal_error,
+    internal_error, warn,
 };
 
 pub struct Intel;
@@ -17,6 +19,12 @@ fn intel_id() -> &'static str {
 }
 
 impl CCompiler for Intel {
+    fn get_dependencies(
+        &self,
+        src: &std::path::Path,
+    ) -> crate::CoreResult<Vec<std::path::PathBuf>> {
+        get_intel_dependencies(src, "icc")
+    }
     fn id(&self) -> &'static str {
         intel_id()
     }
@@ -71,6 +79,12 @@ impl CCompiler for Intel {
 }
 
 impl CppCompiler for Intel {
+    fn get_dependencies(
+        &self,
+        src: &std::path::Path,
+    ) -> crate::CoreResult<Vec<std::path::PathBuf>> {
+        get_intel_dependencies(src, "icpc")
+    }
     fn id(&self) -> &'static str {
         intel_id()
     }
@@ -125,4 +139,48 @@ impl CppCompiler for Intel {
 
         Ok(cmd.finish())
     }
+}
+
+fn get_intel_dependencies(src: &std::path::Path, exe: &str) -> CoreResult<Vec<std::path::PathBuf>> {
+    use std::io::{self, BufRead};
+    use std::process::Command;
+
+    let output = Command::new(exe).arg("-MM").arg(src).output()?;
+
+    if !output.status.success() {
+        return Err(Box::new(CoreError::ResolveDependency {
+            path: src.to_path_buf(),
+            err: String::from_utf8_lossy(&output.stderr).to_string(),
+        }));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let mut deps = Vec::new();
+    for line in stdout.lines() {
+        let line = line.trim_end_matches('\\').trim();
+        if let Some(pos) = line.find(':') {
+            let files = &line[pos + 1..];
+            deps.extend(
+                files
+                    .split_whitespace()
+                    .map(|s| {
+                        let path = PathBuf::from(s);
+                        match path.canonicalize() {
+                            Ok(p) => Ok(p),
+                            Err(e) => {
+                                warn!(&format!(
+                                    "Failed to cannonicalize dependency path: {}",
+                                    path.display()
+                                ));
+                                Err(e)
+                            }
+                        }
+                    })
+                    .filter_map(|res| res.ok()),
+            );
+        }
+    }
+
+    Ok(deps)
 }

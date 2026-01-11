@@ -1,4 +1,7 @@
+use std::path::{Path, PathBuf};
+
 use crate::{
+    CoreResult,
     driver::{
         cannonical_command::CannonicalCommandBuilder,
         toolchain::{
@@ -6,7 +9,7 @@ use crate::{
             traits::{Archiver, CCompiler, CppCompiler, Linker},
         },
     },
-    internal_error,
+    internal_error, warn,
 };
 
 pub struct Msvc;
@@ -16,6 +19,12 @@ fn msvc_id() -> &'static str {
 }
 
 impl CCompiler for Msvc {
+    fn get_dependencies(
+        &self,
+        src: &std::path::Path,
+    ) -> crate::CoreResult<Vec<std::path::PathBuf>> {
+        get_msvc_dependencies()
+    }
     fn id(&self) -> &'static str {
         msvc_id()
     }
@@ -69,6 +78,12 @@ impl CCompiler for Msvc {
 }
 
 impl CppCompiler for Msvc {
+    fn get_dependencies(
+        &self,
+        src: &std::path::Path,
+    ) -> crate::CoreResult<Vec<std::path::PathBuf>> {
+        get_msvc_dependencies()
+    }
     fn id(&self) -> &'static str {
         msvc_id()
     }
@@ -134,4 +149,10 @@ impl Archiver for Msvc {
     fn id(&self) -> &'static str {
         msvc_id()
     }
+}
+
+/// Unfortunatly Msvc pretty much compiles the src to fetch dependencies, so a build cache in the
+/// compilation layer does not save any time. All Msvc builds ignore the build cache entirely!
+fn get_msvc_dependencies() -> CoreResult<Vec<PathBuf>> {
+    Ok(vec![])
 }

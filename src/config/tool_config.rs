@@ -43,7 +43,7 @@ pub trait ToolchainExecutable: Sized + Debug + Serialize {
     fn discover() -> CoreResult<Self>;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ArchiverKind {
     #[serde(rename = "ar")]
     Ar, // Unix/MacOS ar
@@ -76,7 +76,7 @@ impl ToolchainExecutable for ArchiverKind {
 
         for candidate in candidates.iter() {
             if which::which(candidate.executable()).is_ok() {
-                return Ok(candidate.clone());
+                return Ok(*candidate);
             }
         }
 
@@ -94,7 +94,7 @@ impl ToolchainExecutable for ArchiverKind {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum CCompilerKind {
     #[serde(rename = "gcc")]
     Gcc,
@@ -143,7 +143,7 @@ impl ToolchainExecutable for CCompilerKind {
 
         for candidate in candidates.iter() {
             if which::which(candidate.executable()).is_ok() {
-                return Ok(candidate.clone());
+                return Ok(*candidate);
             }
         }
 
@@ -160,7 +160,7 @@ impl ToolchainExecutable for CCompilerKind {
         }))
     }
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum CppCompilerKind {
     #[serde(rename = "g++")]
     Gpp,
@@ -208,7 +208,7 @@ impl ToolchainExecutable for CppCompilerKind {
 
         for candidate in candidates.iter() {
             if which::which(candidate.executable()).is_ok() {
-                return Ok(candidate.clone());
+                return Ok(*candidate);
             }
         }
 
@@ -226,7 +226,7 @@ impl ToolchainExecutable for CppCompilerKind {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum LinkerKind {
     #[serde(rename = "ld")]
     Ld,
@@ -274,7 +274,7 @@ impl ToolchainExecutable for LinkerKind {
 
         for candidate in candidates.iter() {
             if which::which(candidate.executable()).is_ok() {
-                return Ok(candidate.clone());
+                return Ok(*candidate);
             }
         }
 

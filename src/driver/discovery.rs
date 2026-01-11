@@ -5,7 +5,7 @@ use globset::GlobSet;
 use crate::driver::GlobalContext;
 
 impl<'ctx> GlobalContext<'ctx> {
-    fn discover_c_files(&self, ignore: Arc<GlobSet>) -> Vec<PathBuf> {
+    pub fn discover_c_files(&self, ignore: Arc<GlobSet>) -> Vec<PathBuf> {
         let walkdir = self.create_entry_iter_ignore_subpackage(ignore);
         let mut c_files: Vec<PathBuf> = walkdir
             .filter_map(|res| res.ok())
@@ -22,7 +22,28 @@ impl<'ctx> GlobalContext<'ctx> {
         c_files.sort();
         c_files
     }
-    fn discover_include_dirs(&self, ignore: Arc<GlobSet>) -> Vec<PathBuf> {
+    pub fn discover_cpp_files(&self, ignore: Arc<GlobSet>) -> Vec<PathBuf> {
+        let walkdir = self.create_entry_iter_ignore_subpackage(ignore);
+        let mut cpp_files: Vec<PathBuf> = walkdir
+            .filter_map(|res| res.ok())
+            .filter_map(|entry| {
+                if entry.path().is_file()
+                    && entry
+                        .path()
+                        .extension()
+                        .is_some_and(|ext| ext == "cpp" || ext == "cxx" || ext == "cc")
+                {
+                    Some(entry.path().to_path_buf())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        cpp_files.dedup();
+        cpp_files.sort();
+        cpp_files
+    }
+    pub fn discover_include_dirs(&self, ignore: Arc<GlobSet>) -> Vec<PathBuf> {
         let walkdir = self.create_entry_iter_ignore_subpackage(ignore);
         let mut dirs: Vec<PathBuf> = walkdir
             .filter_map(|res| res.ok())

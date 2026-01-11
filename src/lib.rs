@@ -1,9 +1,10 @@
+#![allow(unused)]
+
 pub const RUSTYFORGE_VERSION: &str = "0.4.1";
 
 pub static SHELL: OnceLock<Arc<Mutex<Shell>>> = OnceLock::new();
 
 mod cli;
-mod compiler;
 mod config;
 mod driver;
 mod error;

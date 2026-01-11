@@ -57,10 +57,10 @@ fn resolve_tool<T>(
     toolchain_label: &str,
 ) -> CoreResult<T>
 where
-    T: Clone + Debug + Serialize + ToolchainExecutable,
+    T: Clone + Copy + Debug + Serialize + ToolchainExecutable,
 {
     let candidates = match opt {
-        Some(ToolchainOption::Single(t)) => vec![t.clone()],
+        Some(ToolchainOption::Single(t)) => vec![*t],
         Some(ToolchainOption::List(list)) => list.clone(),
         None => {
             return try_discover_tool::<T>();
@@ -70,7 +70,7 @@ where
     for candidate in candidates.iter() {
         let exe = candidate.executable();
         if which::which(exe).is_ok() {
-            return Ok(candidate.clone());
+            return Ok(*candidate);
         }
     }
 

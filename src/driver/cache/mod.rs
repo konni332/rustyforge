@@ -8,6 +8,7 @@ use std::{
 use crate::{CoreResult, warn};
 
 mod build;
+pub use build::BuildCache;
 
 const DEFAULT_CACHE_VERSION: u64 = 1;
 

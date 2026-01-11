@@ -52,6 +52,9 @@ pub enum CoreError {
 
     #[error("Thread pool error: {0}")]
     ThreadPool(#[from] rayon::ThreadPoolBuildError),
+
+    #[error("Ignore pattern error: {0}")]
+    IgnorePattern(#[from] globset::Error),
 }
 
 impl From<std::io::Error> for Box<CoreError> {
@@ -80,6 +83,12 @@ impl From<postcard::Error> for Box<CoreError> {
 
 impl From<rayon::ThreadPoolBuildError> for Box<CoreError> {
     fn from(value: rayon::ThreadPoolBuildError) -> Self {
+        Box::new(value.into())
+    }
+}
+
+impl From<globset::Error> for Box<CoreError> {
+    fn from(value: globset::Error) -> Self {
         Box::new(value.into())
     }
 }

@@ -72,12 +72,11 @@ impl Hash for CannonicalCommand {
     }
 }
 
-impl From<CannonicalCommand> for std::process::Command {
-    fn from(value: CannonicalCommand) -> Self {
-        let mut cmd = std::process::Command::new(value.program);
-        cmd.args(value.args);
-        cmd.envs(value.env_args);
-        if let Some(cwd) = value.cwd {
+impl From<&CannonicalCommand> for std::process::Command {
+    fn from(value: &CannonicalCommand) -> Self {
+        let mut cmd = std::process::Command::new(&value.program);
+        cmd.args(&value.args);
+        if let Some(cwd) = &value.cwd {
             cmd.current_dir(cwd);
         }
         cmd

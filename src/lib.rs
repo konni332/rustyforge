@@ -6,6 +6,7 @@ pub static SHELL: OnceLock<Arc<Mutex<Shell>>> = OnceLock::new();
 
 mod cli;
 mod config;
+mod diagnostics;
 mod driver;
 mod error;
 pub mod shell;
@@ -20,14 +21,15 @@ pub use cli::CliCommand;
 pub use config::ToolConfig;
 pub use config::ToolchainExecutable;
 pub use config::manifest;
+pub use diagnostics::RustyForgeReport;
+pub use driver::GlobalContext;
 pub use driver::RunTimeConfig;
 pub use driver::TargetKind;
+pub use driver::get_project_info_string;
 pub use error::AnnotatedResult;
 pub use error::CoreError;
 pub use error::CoreResult;
 pub use shell::ui::ProgressBar;
-
-pub use driver::get_project_info_string;
 
 use crate::shell::Shell;
 

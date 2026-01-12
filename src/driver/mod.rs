@@ -10,8 +10,37 @@ mod utils;
 
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::Arc;
 
+use crate::Cli;
+use crate::CoreError;
+use crate::CoreResult;
+use crate::ProgressBar;
+use crate::ToolConfig;
+use crate::config::Manifest;
+use crate::config::tool_config::CCompilerKind;
+use crate::config::tool_config::CppCompilerKind;
+use crate::diagnostics::RustyForgeDiagnostic;
+use crate::driver::cache::BuildCache;
+use crate::driver::cache::CacheFile;
+use crate::driver::cannonical_command::CannonicalCommand;
+use crate::driver::compiler::CompileContext;
+use crate::driver::compiler::CompileResult;
+use crate::driver::runtime::Profile;
+use crate::driver::runtime::RuntimeToolchain;
+use crate::driver::runtime::Target;
+use crate::driver::toolchain::CCompiler;
+use crate::driver::toolchain::Clang;
+use crate::driver::toolchain::CppCompiler;
+use crate::driver::toolchain::Gcc;
+use crate::driver::toolchain::Intel;
+use crate::driver::toolchain::Msvc;
+use crate::internal_error;
+use crate::status;
+use crate::success;
+use crate::utils::display_command;
+use crate::with_shell;
 use globset::Glob;
 use globset::GlobSet;
 use globset::GlobSetBuilder;
@@ -21,27 +50,13 @@ use rayon::prelude::*;
 pub use runtime::RunTimeConfig;
 pub use runtime::TargetKind;
 pub use runtime_info::get_project_info_string;
-
-use crate::Cli;
-use crate::CoreResult;
-use crate::ToolConfig;
-use crate::config::Manifest;
-use crate::config::tool_config::CCompilerKind;
-use crate::config::tool_config::CppCompilerKind;
-use crate::driver::cannonical_command::CannonicalCommand;
-use crate::driver::runtime::Target;
-use crate::driver::toolchain::CCompiler;
-use crate::driver::toolchain::Clang;
-use crate::driver::toolchain::CppCompiler;
-use crate::driver::toolchain::Gcc;
-use crate::driver::toolchain::Intel;
-use crate::driver::toolchain::Msvc;
-use crate::internal_error;
+use std::hash::{Hash, Hasher};
 
 pub struct GlobalContext<'ctx> {
     pub cwd: PathBuf,
     pub config: RunTimeConfig<'ctx>,
     pool: Arc<ThreadPool>,
+    cache: CacheFile<BuildCache>,
 }
 
 impl<'ctx> GlobalContext<'ctx> {
@@ -59,115 +74,83 @@ impl<'ctx> GlobalContext<'ctx> {
                 .build()?,
         );
 
-        Ok(Self { cwd, config, pool })
-    }
+        let cache_path = cwd.join("build").join("build.cache");
+        let cache = CacheFile::new(cache_path)?;
 
-    fn compile_target_cmds(&self, target: &Target) -> CoreResult<CompilationResult> {
-        let output_dir = self.get_object_dir(target);
-        let ignore_set = build_ignore_set(target)?;
-        let c_files = self.discover_c_files(ignore_set.clone());
-        let cpp_files = self.discover_cpp_files(ignore_set.clone());
-
-        let ccomp = make_c_compiler(self.config.toolchain.c_compiler);
-        let mut c_commands =
-            self.make_commands_for_c_files(&*ccomp, &c_files, target, &output_dir)?;
-
-        let cppcomp = make_cpp_compiler(self.config.toolchain.cpp_compiler);
-        let cpp_commands =
-            self.make_commands_for_cpp_files(&*cppcomp, &cpp_files, target, &output_dir)?;
-
-        let has_cpp = !cpp_commands.is_empty();
-        c_commands.extend(cpp_commands);
-        Ok(CompilationResult {
-            has_cpp,
-            cmds: c_commands,
+        Ok(Self {
+            cwd,
+            config,
+            pool,
+            cache,
         })
     }
 
-    fn make_commands_for_c_files(
-        &self,
-        compiler: &dyn CCompiler,
-        files: &[PathBuf],
-        target: &Target,
-        object_dir: &Path,
-    ) -> CoreResult<Vec<CannonicalCommand>> {
-        let profile = &self.config.profile;
-        let pool = self.pool.clone();
-
-        pool.install(|| {
-            files
-                .par_iter()
-                .map(|path| {
-                    let output = object_path(object_dir, path);
-                    compiler.compile_unit_cmd(path, &output, profile, target)
-                })
-                .collect()
-        })
-    }
-
-    fn make_commands_for_cpp_files(
-        &self,
-        compiler: &dyn CppCompiler,
-        files: &[PathBuf],
-        target: &Target,
-        object_dir: &Path,
-    ) -> CoreResult<Vec<CannonicalCommand>> {
-        let profile = &self.config.profile;
-        let pool = self.pool.clone();
-
-        pool.install(|| {
-            files
-                .par_iter()
-                .map(|path| {
-                    let output = object_path(object_dir, path);
-                    compiler.compile_unit_cmd(path, &output, profile, target)
-                })
-                .collect()
-        })
-    }
-}
-
-pub struct CompilationResult {
-    pub has_cpp: bool,
-    pub cmds: Vec<CannonicalCommand>,
-}
-
-fn build_ignore_set(target: &Target) -> CoreResult<Arc<GlobSet>> {
-    let mut builder = GlobSetBuilder::new();
-    if let Some(ignore_patterns) = &target.ignore {
-        for pat in ignore_patterns {
-            let glob = Glob::new(pat)?;
-            builder.add(glob);
+    pub fn build(&mut self) -> CoreResult<()> {
+        for target in self.config.targets.clone() {
+            let CompileResult { cmds, has_cpp } = self.compile(&target)?;
+            let failed = self.execute_build_commands(&cmds)?;
+            if failed {
+                return Err(Box::new(CoreError::BuildFailed));
+            }
         }
+        Ok(())
     }
-    Ok(Arc::new(builder.build()?))
-}
 
-fn make_c_compiler(kind: CCompilerKind) -> Box<dyn CCompiler> {
-    match kind {
-        CCompilerKind::Gcc => Box::new(Gcc),
-        CCompilerKind::Clang => Box::new(Clang),
-        CCompilerKind::Msvc => Box::new(Msvc),
-        CCompilerKind::Icc => Box::new(Intel),
-    }
-}
+    fn execute_build_commands(&self, ccmds: &[(CannonicalCommand, u64)]) -> CoreResult<bool> {
+        let mut failed = false;
+        let mut pb = ProgressBar::new(ccmds.len());
+        for (ccmd, hash) in ccmds {
+            status!(&"Compiling".to_string(), &pb.render());
+            pb.next();
 
-fn make_cpp_compiler(kind: CppCompilerKind) -> Box<dyn CppCompiler> {
-    match kind {
-        CppCompilerKind::Gpp => Box::new(Gcc),
-        CppCompilerKind::Clangpp => Box::new(Clang),
-        CppCompilerKind::Msvc => Box::new(Msvc),
-        CppCompilerKind::Icc => Box::new(Intel),
-    }
-}
-
-fn object_path(dir: &Path, src_file: &Path) -> PathBuf {
-    let file_name = match src_file.file_name() {
-        Some(n) => n,
-        None => {
-            internal_error!("Failed to determine source file, filename");
+            if self.cache.contains(hash) {
+                continue;
+            } else {
+                self.cache.insert(hash, PathBuf::new());
+            }
+            let mut cmd = std::process::Command::from(ccmd);
+            let output = cmd.output()?;
+            if !output.status.success() {
+                let diagnostic = RustyForgeDiagnostic::BuildCommandFail {
+                    cmd: display_command(&cmd),
+                    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+                };
+                with_shell(|sh| {
+                    sh.print_miette(&diagnostic);
+                });
+                failed = true;
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
         }
-    };
+        success!(&"Compiled".to_string());
+        Ok(failed)
+    }
 
-    dir.join(file_name)
+    fn compile(&mut self, target: &Target) -> CoreResult<CompileResult> {
+        let ignore = if let Some(patterns) = target.ignore.as_ref() {
+            let globs: Vec<Glob> = patterns
+                .iter()
+                .filter_map(|pat| Glob::new(pat).ok())
+                .collect();
+            Arc::new(GlobSet::new(globs)?)
+        } else {
+            let globs: Vec<Glob> = Vec::new();
+            Arc::new(GlobSet::new(globs)?)
+        };
+        self.create_file_structure(target)?;
+        let c_files = self.discover_c_files(ignore.clone());
+        let cpp_files = self.discover_cpp_files(ignore.clone());
+        let includes = self.discover_include_dirs(ignore.clone());
+        let obj_dir = self.get_object_dir(target);
+        let compile_ctx = CompileContext::new(
+            &includes,
+            &c_files,
+            &cpp_files,
+            target,
+            &self.config.profile,
+            &self.config.toolchain,
+            &mut self.cache,
+        );
+        compile_ctx.build(&obj_dir)
+    }
 }

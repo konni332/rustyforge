@@ -34,27 +34,35 @@ impl<I: CacheFileInner + Serialize + DeserializeOwned> CacheFile<I> {
             path: path.as_ref().to_path_buf(),
         })
     }
-    pub fn insert(&mut self, k: &I::Key, v: I::Value) -> Option<I::Value> {
+    pub fn insert(&self, k: &I::Key, v: I::Value) -> Option<I::Value> {
         let mut guard = self.inner.write().unwrap();
         guard.insert(k, v)
+    }
+    pub fn contains(&self, k: &I::Key) -> bool {
+        self.inner.read().unwrap().contains(k)
     }
     pub fn get(&self, k: &I::Key) -> Option<I::Value> {
         let guard = self.inner.read().unwrap();
         guard.get(k).cloned()
     }
-    pub fn flush(&mut self) -> CoreResult<()> {
+    pub fn flush(&self) -> CoreResult<()> {
         let guard = self.inner.read().unwrap();
         let src: Vec<u8> = postcard::to_allocvec(&*guard)?;
         std::fs::write(&self.path, src)?;
         Ok(())
+    }
+    pub fn seed(&self) -> u64 {
+        self.inner.read().unwrap().seed()
     }
 }
 
 impl<I: CacheFileInner + Serialize + DeserializeOwned> Drop for CacheFile<I> {
     fn drop(&mut self) {
         if let Err(e) = self.flush() {
+            let path = &self.path;
             warn!(&format!(
-                "Failed to flush cache to file while dropping: {e}"
+                "Failed to flush cache to file ({}) while dropping: {e}\n",
+                path.display(),
             ));
         }
     }
@@ -69,4 +77,6 @@ pub trait CacheFileInner {
         Self: Sized;
     fn insert(&mut self, k: &Self::Key, v: Self::Value) -> Option<Self::Value>;
     fn get(&self, k: &Self::Key) -> Option<&Self::Value>;
+    fn seed(&self) -> u64;
+    fn contains(&self, k: &Self::Key) -> bool;
 }

@@ -54,6 +54,9 @@ impl Shell {
     pub fn set_verbosity(&mut self, verbosity: &clap_verbosity_flag::Verbosity) {
         self.verbosity = verbosity.into();
     }
+    pub fn get_verbosity(&self) -> Verbosity {
+        self.verbosity
+    }
     pub fn out(&mut self) -> &mut (dyn Write + Send + Sync) {
         if self.needs_clear {
             self.err_clear_ln();

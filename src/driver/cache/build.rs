@@ -33,4 +33,10 @@ impl CacheFileInner for BuildCache {
     fn insert(&mut self, k: &Self::Key, v: Self::Value) -> Option<Self::Value> {
         self.data.insert(*k, v)
     }
+    fn seed(&self) -> u64 {
+        self.seed
+    }
+    fn contains(&self, k: &Self::Key) -> bool {
+        self.data.contains_key(k)
+    }
 }

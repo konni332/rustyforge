@@ -14,19 +14,21 @@ use crate::{
 
 pub struct Msvc;
 
-fn msvc_id() -> &'static str {
-    "msvc"
-}
-
 impl CCompiler for Msvc {
     fn get_dependencies(
         &self,
-        src: &std::path::Path,
-    ) -> crate::CoreResult<Vec<std::path::PathBuf>> {
-        get_msvc_dependencies()
+        src: &Path,
+        profile: &crate::driver::runtime::Profile,
+        target: &crate::driver::runtime::Target,
+        includes: &[PathBuf],
+    ) -> CoreResult<Vec<PathBuf>> {
+        Ok(vec![])
     }
-    fn id(&self) -> &'static str {
-        msvc_id()
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        Msvc
     }
     fn compile_unit_cmd(
         &self,
@@ -34,6 +36,7 @@ impl CCompiler for Msvc {
         output: &std::path::Path,
         profile: &crate::driver::runtime::Profile,
         target: &crate::driver::runtime::Target,
+        includes: &[PathBuf],
     ) -> crate::CoreResult<crate::driver::cannonical_command::CannonicalCommand> {
         if path.extension().and_then(|e| e.to_str()) != Some("c") {
             internal_error!("Msvc C Compiler received non-C file");
@@ -57,6 +60,10 @@ impl CCompiler for Msvc {
             cmd.arg("/Zi");
         }
 
+        for dir in includes {
+            cmd.arg("/I").arg(dir);
+        }
+
         cmd.arg(format!(
             "/D{}{}",
             PROFILE_DEFINE_TEMPLATE,
@@ -78,14 +85,20 @@ impl CCompiler for Msvc {
 }
 
 impl CppCompiler for Msvc {
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        Msvc
+    }
     fn get_dependencies(
         &self,
-        src: &std::path::Path,
-    ) -> crate::CoreResult<Vec<std::path::PathBuf>> {
-        get_msvc_dependencies()
-    }
-    fn id(&self) -> &'static str {
-        msvc_id()
+        src: &Path,
+        profile: &crate::driver::runtime::Profile,
+        target: &crate::driver::runtime::Target,
+        includes: &[PathBuf],
+    ) -> CoreResult<Vec<PathBuf>> {
+        Ok(vec![])
     }
     fn compile_unit_cmd(
         &self,
@@ -93,6 +106,7 @@ impl CppCompiler for Msvc {
         output: &std::path::Path,
         profile: &crate::driver::runtime::Profile,
         target: &crate::driver::runtime::Target,
+        includes: &[PathBuf],
     ) -> crate::CoreResult<crate::driver::cannonical_command::CannonicalCommand> {
         if !matches!(
             path.extension().and_then(|e| e.to_str()),
@@ -119,6 +133,10 @@ impl CppCompiler for Msvc {
             cmd.arg("/Zi");
         }
 
+        for dir in includes {
+            cmd.arg("/I").arg(dir);
+        }
+
         cmd.arg(format!(
             "/D{}{}",
             PROFILE_DEFINE_TEMPLATE,
@@ -136,18 +154,6 @@ impl CppCompiler for Msvc {
         }
 
         Ok(cmd.finish())
-    }
-}
-
-impl Linker for Msvc {
-    fn id(&self) -> &'static str {
-        msvc_id()
-    }
-}
-
-impl Archiver for Msvc {
-    fn id(&self) -> &'static str {
-        msvc_id()
     }
 }
 

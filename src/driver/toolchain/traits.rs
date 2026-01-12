@@ -1,35 +1,54 @@
 use std::path::{Path, PathBuf};
 
 use crate::{
-    CoreResult,
+    CoreResult, TargetKind,
     driver::{
-        cannonical_command::CannonicalCommand,
+        cannonical_command::{CannonicalCommand, CannonicalCommandBuilder},
         runtime::{Profile, Target},
+        toolchain::PROFILE_DEFINE_TEMPLATE,
     },
 };
 
 pub trait CCompiler: Send + Sync {
-    fn id(&self) -> &'static str;
+    fn new() -> Self
+    where
+        Self: Sized;
     fn compile_unit_cmd(
         &self,
         path: &Path,
         output: &Path,
         profile: &Profile,
         target: &Target,
+        includes: &[PathBuf],
     ) -> CoreResult<CannonicalCommand>;
-    fn get_dependencies(&self, src: &Path) -> CoreResult<Vec<PathBuf>>;
+    fn get_dependencies(
+        &self,
+        src: &Path,
+        profile: &Profile,
+        target: &Target,
+        includes: &[PathBuf],
+    ) -> CoreResult<Vec<PathBuf>>;
 }
 
 pub trait CppCompiler: Send + Sync {
-    fn id(&self) -> &'static str;
+    fn new() -> Self
+    where
+        Self: Sized;
     fn compile_unit_cmd(
         &self,
         path: &Path,
         output: &Path,
         profile: &Profile,
         target: &Target,
+        includes: &[PathBuf],
     ) -> CoreResult<CannonicalCommand>;
-    fn get_dependencies(&self, src: &Path) -> CoreResult<Vec<PathBuf>>;
+    fn get_dependencies(
+        &self,
+        src: &Path,
+        profile: &Profile,
+        target: &Target,
+        includes: &[PathBuf],
+    ) -> CoreResult<Vec<PathBuf>>;
 }
 
 pub trait Linker {

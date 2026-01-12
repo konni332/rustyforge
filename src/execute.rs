@@ -1,6 +1,6 @@
 use rustyforge_core::{
-    CoreError, CoreResult, RunTimeConfig, get_project_info_string, internal_error,
-    manifest::Manifest,
+    Cli, CoreError, CoreResult, GlobalContext, RunTimeConfig, ToolConfig, get_project_info_string,
+    internal_error, manifest::Manifest, success,
 };
 
 /// Initializes RustyForge project in the current directory
@@ -34,6 +34,15 @@ pub fn create_new_rustyforge(name: &str, bin: bool, lib: bool) -> CoreResult<()>
     Ok(())
 }
 
+pub fn clean() -> CoreResult<()> {
+    let path = std::env::current_dir()?.join("build");
+    if path.exists() {
+        std::fs::remove_dir_all(&path)?;
+    }
+    success!(&"Cleaned".to_string(), &"build artifacts".to_string());
+    Ok(())
+}
+
 pub fn project_info(runtime_config: &RunTimeConfig, json: bool) -> CoreResult<()> {
     if json {
         let str = match serde_json::to_string_pretty(runtime_config) {
@@ -63,4 +72,9 @@ pub fn project_info(runtime_config: &RunTimeConfig, json: bool) -> CoreResult<()
     }
 
     Ok(())
+}
+
+pub fn build(cli: &Cli, manifest: &Manifest, config: &ToolConfig) -> CoreResult<()> {
+    let mut ctx = GlobalContext::new(cli, manifest, config)?;
+    ctx.build()
 }

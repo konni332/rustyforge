@@ -1,7 +1,7 @@
 #![allow(unused)]
 
+use crate::CoreError;
 use miette::{Diagnostic, NamedSource, SourceSpan};
-use rustyforge_core::CoreError;
 use thiserror::Error;
 
 #[derive(Debug, Error, Diagnostic)]
@@ -71,6 +71,9 @@ pub enum RustyForgeDiagnostic {
 
         msg: String,
     },
+
+    #[error("Build command failed:\n`{cmd}`\n{stderr}")]
+    BuildCommandFail { cmd: String, stderr: String },
 }
 
 impl From<CoreError> for RustyForgeReport {

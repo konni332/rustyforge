@@ -56,8 +56,11 @@ pub enum CoreError {
     #[error("Ignore pattern error: {0}")]
     IgnorePattern(#[from] globset::Error),
 
-    #[error("Failed to resolve dependencies for {path}: {err}")]
-    ResolveDependency { path: PathBuf, err: String },
+    #[error("Failed to resolve dependencies for {cmd}: {err}")]
+    ResolveDependency { err: String, cmd: String },
+
+    #[error("Build failed")]
+    BuildFailed,
 }
 
 impl From<std::io::Error> for Box<CoreError> {

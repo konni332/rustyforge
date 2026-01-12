@@ -66,6 +66,25 @@ impl Shell {
             _ => self.output.message_stderr(&status, message, color),
         }
     }
+    pub fn print_verbose(
+        &mut self,
+        status: &dyn Display,
+        message: Option<&dyn Display>,
+        color: &Style,
+    ) -> CoreResult<()> {
+        if self.needs_clear {
+            self.err_clear_ln();
+        }
+        let status = if self.stderr_unicode() {
+            format!("▶ {status}")
+        } else {
+            format!("> {status}")
+        };
+        match self.verbosity {
+            Verbosity::Verbose => self.output.message_stderr(&status, message, color),
+            _ => Ok(()),
+        }
+    }
     pub fn set_needs_clear(&mut self, needs_clear: bool) {
         self.needs_clear = needs_clear;
     }
@@ -154,8 +173,19 @@ macro_rules! status {
             format!("\r{style}{}{style:#} {}", $status, $message)
         };
         $crate::drop_eprint!("{}", msg);
+        #[allow(dropping_copy_types)]
         drop($crate::with_shell(|sh| sh.set_needs_clear(true)));
     }};
+}
+
+#[macro_export]
+macro_rules! verbose {
+    ($($arg:tt)*) => {
+        let status = "Verbose".to_string();
+        let style = $crate::shell::ui::VERBOSE;
+        let msg = format!(format_args!($($arg)*));
+        drop($crate::with_shell(|sh| sh.print_verbose(status, Some(msg), style)));
+    };
 }
 
 #[macro_export]
@@ -174,6 +204,7 @@ macro_rules! __shell_print {
 #[macro_export]
 macro_rules! drop_print {
     ($($arg:tt)*) => {
+        #[allow(dropping_copy_types)]
         drop($crate::__shell_print!(format_args!($($arg)*), false, false));
     };
 }
@@ -181,9 +212,11 @@ macro_rules! drop_print {
 #[macro_export]
 macro_rules! drop_println {
     () => {
+        #[allow(dropping_copy_types)]
         drop($crate::__shell_print!('\n', true, false));
     };
     ($($arg:tt)*) => {
+        #[allow(dropping_copy_types)]
         drop($crate::__shell_print!(format_args!($($arg)*), true, false));
     };
 }
@@ -191,6 +224,7 @@ macro_rules! drop_println {
 #[macro_export]
 macro_rules! drop_eprint {
     ($($arg:tt)*) => {
+        #[allow(dropping_copy_types)]
         drop($crate::__shell_print!(format_args!($($arg)*), false, true));
     };
 }
@@ -198,9 +232,11 @@ macro_rules! drop_eprint {
 #[macro_export]
 macro_rules! drop_eprintln {
     () => {
+        #[allow(dropping_copy_types)]
         drop($crate::__shell_print!('\n', true, true));
     };
     ($($arg:tt)*) => {
+        #[allow(dropping_copy_types)]
         drop($crate::__shell_print!(format_args!($($arg)*), true, true));
     };
 }
@@ -211,3 +247,4 @@ pub const ERROR: Style = annotate_snippets::renderer::DEFAULT_ERROR_STYLE;
 pub const INFO: Style = annotate_snippets::renderer::DEFAULT_INFO_STYLE;
 pub const SUCCESS: Style = AnsiColor::BrightGreen.on_default().effects(Effects::BOLD);
 pub const STATUS: Style = AnsiColor::Cyan.on_default().effects(Effects::BOLD);
+pub const VERBOSE: Style = AnsiColor::Magenta.on_default().effects(Effects::BOLD);

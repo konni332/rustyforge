@@ -52,9 +52,23 @@ pub trait CppCompiler: Send + Sync {
 }
 
 pub trait Linker {
-    fn id(&self) -> &'static str;
+    fn new() -> Self
+    where
+        Self: Sized;
+    fn link_objects(
+        &self,
+        target: &Target,
+        profile: &Profile,
+        srcs: &[PathBuf],
+        contains_cpp: bool,
+        lib_dirs: &[PathBuf],
+        output: &Path,
+    ) -> CoreResult<CannonicalCommand>;
 }
 
 pub trait Archiver {
-    fn id(&self) -> &'static str;
+    fn new() -> Self
+    where
+        Self: Sized;
+    fn archiver_objects(&self, objs: &[PathBuf], output: PathBuf) -> CoreResult<CannonicalCommand>;
 }

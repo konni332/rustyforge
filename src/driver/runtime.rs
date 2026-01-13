@@ -48,7 +48,7 @@ pub struct Target<'a> {
     pub defines: &'a Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub enum TargetKind<'a> {
     Static,
     Shared,

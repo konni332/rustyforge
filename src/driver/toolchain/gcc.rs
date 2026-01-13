@@ -6,7 +6,8 @@ use std::{
 use crate::{
     CoreError, CoreResult, TargetKind,
     driver::{
-        cannonical_command::CannonicalCommandBuilder,
+        cannonical_command::{CannonicalCommand, CannonicalCommandBuilder},
+        runtime::Profile,
         toolchain::{
             PROFILE_DEFINE_TEMPLATE,
             clang::build_command_compile,
@@ -38,7 +39,8 @@ impl CCompiler for Gcc {
         target: &crate::driver::runtime::Target,
         includes: &[PathBuf],
     ) -> CoreResult<Vec<PathBuf>> {
-        let mut cmd = CannonicalCommandBuilder::new("gcc");
+        let executable = if cfg!(windows) { "gcc.exe" } else { "gcc" };
+        let mut cmd = CannonicalCommandBuilder::new(executable);
         cmd.arg("-MM").arg(src);
         let cmd = build_command_compile(src, cmd, profile, target, includes)?;
         let output = Command::from(&cmd).output()?;
@@ -91,8 +93,8 @@ impl CCompiler for Gcc {
         if path.extension().and_then(|e| e.to_str()) != Some("c") {
             internal_error!("Gcc C Compiler received non-C file");
         }
-
-        let mut cmd = CannonicalCommandBuilder::new("gcc");
+        let executable = if cfg!(windows) { "gcc.exe" } else { "gcc" };
+        let mut cmd = CannonicalCommandBuilder::new(executable);
 
         cmd.arg("-c").arg(path).arg("-o").arg(output);
 
@@ -114,7 +116,8 @@ impl CppCompiler for Gcc {
         target: &crate::driver::runtime::Target,
         includes: &[PathBuf],
     ) -> CoreResult<Vec<PathBuf>> {
-        let mut cmd = CannonicalCommandBuilder::new("g++");
+        let executable = if cfg!(windows) { "g++.exe" } else { "g++" };
+        let mut cmd = CannonicalCommandBuilder::new(executable);
         cmd.arg("-MM").arg(src);
         let cmd = build_command_compile(src, cmd, profile, target, includes)?;
         let output = Command::from(&cmd).output()?;
@@ -170,11 +173,69 @@ impl CppCompiler for Gcc {
         ) {
             internal_error!("GCC C++ Compiler received non-C++ file");
         }
-
-        let mut cmd = CannonicalCommandBuilder::new("g++");
+        let executable = if cfg!(windows) { "g++.exe" } else { "g++" };
+        let mut cmd = CannonicalCommandBuilder::new(executable);
 
         cmd.arg("-c").arg(path).arg("-o").arg(output);
 
         build_command_compile(path, cmd, profile, target, includes)
+    }
+}
+
+impl Linker for Gcc {
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        Gcc
+    }
+    fn link_objects(
+        &self,
+        target: &crate::driver::runtime::Target,
+        profile: &Profile,
+        objs: &[PathBuf],
+        contains_cpp: bool,
+        lib_dirs: &[PathBuf],
+        output: &Path,
+    ) -> CoreResult<CannonicalCommand> {
+        if target.kind == TargetKind::Static {
+            internal_error!(
+                "Tried to link static library target, should have used archiver instead"
+            );
+        }
+        #[cfg(windows)]
+        let executable = if contains_cpp { "g++.exe" } else { "gcc.exe" };
+        #[cfg(not(windows))]
+        let executable = if contains_cpp { "g++" } else { "gcc" };
+
+        let mut cmd = CannonicalCommandBuilder::new(executable);
+
+        if matches!(target.kind, TargetKind::Shared) {
+            cmd.arg("-shared");
+        }
+
+        if profile.lto {
+            cmd.arg("-flto");
+        }
+
+        if profile.debug {
+            cmd.arg("-g");
+        }
+
+        for dir in lib_dirs {
+            cmd.arg("-L").arg(dir);
+        }
+
+        for obj in objs {
+            cmd.arg(obj);
+        }
+
+        cmd.arg("-o").arg(output);
+
+        if let Some(flags) = &target.flags {
+            cmd.args(flags);
+        }
+
+        Ok(cmd.finish())
     }
 }

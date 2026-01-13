@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use crate::{
-    CoreResult,
+    CoreResult, TargetKind,
     driver::{
-        cannonical_command::CannonicalCommandBuilder,
+        cannonical_command::{CannonicalCommand, CannonicalCommandBuilder},
+        runtime::Profile,
         toolchain::{
             PROFILE_DEFINE_TEMPLATE,
             traits::{Archiver, CCompiler, CppCompiler, Linker},
@@ -161,4 +162,60 @@ impl CppCompiler for Msvc {
 /// compilation layer does not save any time. All Msvc builds ignore the build cache entirely!
 fn get_msvc_dependencies() -> CoreResult<Vec<PathBuf>> {
     Ok(vec![])
+}
+
+impl Linker for Msvc {
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        Msvc
+    }
+    fn link_objects(
+        &self,
+        target: &crate::driver::runtime::Target,
+        profile: &Profile,
+        objs: &[PathBuf],
+        contains_cpp: bool,
+        lib_dirs: &[PathBuf],
+        output: &Path,
+    ) -> CoreResult<CannonicalCommand> {
+        if target.kind == TargetKind::Static {
+            internal_error!(
+                "Tried to link static library target, should have used archiver instead"
+            );
+        }
+
+        let mut cmd = CannonicalCommandBuilder::new("cl.exe");
+
+        if profile.lto {
+            cmd.arg("/GL");
+        }
+
+        for obj in objs {
+            cmd.arg(obj);
+        }
+
+        cmd.arg("/link");
+
+        if matches!(target.kind, TargetKind::Shared) {
+            cmd.arg("/DLL");
+        }
+
+        if profile.lto {
+            cmd.arg("/LTCG");
+        }
+
+        for dir in lib_dirs {
+            cmd.arg(format!("/LIBPATH:{}", dir.display()));
+        }
+
+        cmd.arg(format!("/OUT:{}", output.display()));
+
+        if let Some(flags) = &target.flags {
+            cmd.args(flags);
+        }
+
+        Ok(cmd.finish())
+    }
 }

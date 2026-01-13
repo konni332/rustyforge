@@ -1,3 +1,4 @@
+mod archiver;
 mod cache;
 mod cannonical_command;
 mod compiler;

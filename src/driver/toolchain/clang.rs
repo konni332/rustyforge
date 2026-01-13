@@ -36,7 +36,8 @@ impl CCompiler for Clang {
         target: &crate::driver::runtime::Target,
         includes: &[PathBuf],
     ) -> CoreResult<Vec<PathBuf>> {
-        let mut cmd = CannonicalCommandBuilder::new("clang");
+        let executable = if cfg!(windows) { "clang.exe" } else { "clang" };
+        let mut cmd = CannonicalCommandBuilder::new(executable);
         cmd.arg("-MM").arg(src);
         let cmd = build_command_compile(src, cmd, profile, target, includes)?;
         let output = Command::from(&cmd).output()?;
@@ -89,8 +90,8 @@ impl CCompiler for Clang {
         if path.extension().and_then(|e| e.to_str()) != Some("c") {
             internal_error!("Clang C Compiler received non-C file");
         }
-
-        let mut cmd = CannonicalCommandBuilder::new("clang");
+        let executable = if cfg!(windows) { "clang.exe" } else { "clang" };
+        let mut cmd = CannonicalCommandBuilder::new(executable);
 
         cmd.arg("-c").arg(path).arg("-o").arg(output);
 
@@ -109,7 +110,12 @@ impl CppCompiler for Clang {
         target: &crate::driver::runtime::Target,
         includes: &[PathBuf],
     ) -> CoreResult<Vec<PathBuf>> {
-        let mut cmd = CannonicalCommandBuilder::new("clang++");
+        let executable = if cfg!(windows) {
+            "clang++.exe"
+        } else {
+            "clang++"
+        };
+        let mut cmd = CannonicalCommandBuilder::new(executable);
         cmd.arg("-MM").arg(src);
         let cmd = build_command_compile(src, cmd, profile, target, includes)?;
         let output = Command::from(&cmd).output()?;
@@ -166,7 +172,12 @@ impl CppCompiler for Clang {
             internal_error!("Clang C++ Compiler received non-C++ file");
         }
 
-        let mut cmd = CannonicalCommandBuilder::new("clang++");
+        let executable = if cfg!(windows) {
+            "clang++.exe"
+        } else {
+            "clang++"
+        };
+        let mut cmd = CannonicalCommandBuilder::new(executable);
 
         cmd.arg("-c").arg(path).arg("-o").arg(output);
 
@@ -217,4 +228,66 @@ pub fn build_command_compile(
     }
 
     Ok(cmd.finish())
+}
+
+impl Linker for Clang {
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        Clang
+    }
+    fn link_objects(
+        &self,
+        target: &Target,
+        profile: &Profile,
+        objs: &[PathBuf],
+        contains_cpp: bool,
+        lib_dirs: &[PathBuf],
+        output: &Path,
+    ) -> CoreResult<CannonicalCommand> {
+        if target.kind == TargetKind::Static {
+            internal_error!(
+                "Tried to link static library target, should have used archiver instead"
+            );
+        }
+        #[cfg(windows)]
+        let executable = if contains_cpp {
+            "clang++.exe"
+        } else {
+            "clang.exe"
+        };
+        #[cfg(not(windows))]
+        let executable = if contains_cpp { "clang++" } else { "clang" };
+
+        let mut cmd = CannonicalCommandBuilder::new(executable);
+
+        if matches!(target.kind, TargetKind::Shared) {
+            cmd.arg("-shared");
+        }
+
+        if profile.lto {
+            cmd.arg("-flto");
+        }
+
+        if profile.debug {
+            cmd.arg("-g");
+        }
+
+        for dir in lib_dirs {
+            cmd.arg("-L").arg(dir);
+        }
+
+        for obj in objs {
+            cmd.arg(obj);
+        }
+
+        cmd.arg("-o").arg(output);
+
+        if let Some(flags) = &target.flags {
+            cmd.args(flags);
+        }
+
+        Ok(cmd.finish())
+    }
 }

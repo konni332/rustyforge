@@ -64,6 +64,9 @@ pub enum CoreError {
 
     #[error("Not supported: {msg}")]
     NotSupported { msg: String, note: String },
+
+    #[error("Already initialized")]
+    AlreadyInitialized,
 }
 
 impl From<std::io::Error> for Box<CoreError> {

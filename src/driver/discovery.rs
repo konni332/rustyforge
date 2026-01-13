@@ -70,19 +70,32 @@ impl<'ctx> GlobalContext<'ctx> {
     }
     pub fn discover_include_dirs(&self, ignore: Arc<GlobSet>) -> Vec<PathBuf> {
         let walkdir = self.create_entry_iter_ignore_subpackage(&self.cwd, ignore);
-        let mut dirs: Vec<PathBuf> = walkdir
-            .filter_map(|res| res.ok())
-            .filter_map(|entry| {
-                if entry.path().is_file() && entry.path().extension().is_some_and(|ext| ext == "h")
-                {
-                    Some(entry.parent_path().to_path_buf())
-                } else {
-                    None
+
+        let mut dirs = Vec::<PathBuf>::new();
+
+        for entry in walkdir.filter_map(Result::ok) {
+            let path = entry.path();
+
+            if path.is_file()
+                && path
+                    .extension()
+                    .is_some_and(|ext| (ext == "h") || (ext == "hpp"))
+            {
+                let mut cur = path.parent();
+
+                while let Some(dir) = cur {
+                    // Stop BEFORE walk root
+                    if dir == self.cwd {
+                        break;
+                    }
+
+                    dirs.push(dir.to_path_buf());
+                    cur = dir.parent();
                 }
-            })
-            .collect();
-        dirs.dedup();
+            }
+        }
         sort_include_dirs(&mut dirs);
+        dirs.dedup();
         dirs
     }
     fn create_entry_iter_ignore_subpackage(

@@ -1,0 +1,10 @@
+[package]
+name = "static-lib"
+version = "0.1.0"
+edition = "c11"
+
+[lib]
+name = "mylib"
+type = "static"
+
+[build]

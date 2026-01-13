@@ -2,29 +2,33 @@ use std::sync::Arc;
 
 use globset::GlobSet;
 use rustyforge_core::{
-    Cli, CoreResult, GlobalContext, ProjectInfo, ToolConfig, internal_error, manifest::Manifest,
-    shell::Verbosity, success, with_shell,
+    Cli, CoreError, CoreResult, GlobalContext, ProjectInfo, ToolConfig, internal_error,
+    manifest::Manifest, shell::Verbosity, success, with_shell,
 };
 
 /// Initializes RustyForge project in the current directory
-pub fn initialize_new_rustyforge() -> CoreResult<()> {
-    match std::env::current_dir()?
-        .file_name()
-        .and_then(|s| s.to_str())
-    {
+pub fn initialize_new_rustyforge(force: bool) -> CoreResult<()> {
+    let cwd = std::env::current_dir()?;
+    if cwd.join("RustyForge.toml").exists() && !force {
+        return Err(Box::new(CoreError::AlreadyInitialized));
+    }
+    match cwd.file_name().and_then(|s| s.to_str()) {
         Some(name) => Manifest::write_new(name),
         None => Manifest::write_default(),
     }?;
+    success!(&"Initialized", &"new project");
     Ok(())
 }
 
 /// Creates an new RustyForge project
-pub fn create_new_rustyforge(name: &str, bin: bool, lib: bool) -> CoreResult<()> {
+pub fn create_new_rustyforge(name: &str, bin: bool, lib: bool, force: bool) -> CoreResult<()> {
     let old_cwd = std::env::current_dir()?;
     let project_dir = old_cwd.join(name);
     std::fs::create_dir_all(&project_dir)?;
-    std::env::set_current_dir(project_dir)?;
-
+    std::env::set_current_dir(&project_dir)?;
+    if project_dir.join("RustyForge.toml").exists() && !force {
+        return Err(Box::new(CoreError::AlreadyInitialized));
+    }
     if bin {
         Manifest::write_bin_template(name)?;
     } else if lib {
@@ -34,6 +38,8 @@ pub fn create_new_rustyforge(name: &str, bin: bool, lib: bool) -> CoreResult<()>
     }
 
     std::env::set_current_dir(old_cwd)?;
+
+    success!(&"Created", &format!("new project: {name}"));
     Ok(())
 }
 
@@ -42,7 +48,7 @@ pub fn clean() -> CoreResult<()> {
     if path.exists() {
         std::fs::remove_dir_all(&path)?;
     }
-    success!(&"Cleaned".to_string(), &"build artifacts".to_string());
+    success!(&"Cleaned", &"build artifacts");
     Ok(())
 }
 

@@ -81,6 +81,12 @@ pub enum RustyForgeDiagnostic {
         #[help]
         help: String,
     },
+
+    #[error("existing project found")]
+    AlreadyInitialized {
+        #[help]
+        help: String,
+    },
 }
 
 impl From<CoreError> for RustyForgeReport {
@@ -142,6 +148,9 @@ impl TryFrom<&CoreError> for RustyForgeDiagnostic {
             CoreError::NotSupported { msg, note } => Ok(RustyForgeDiagnostic::NotSupported {
                 msg: msg.to_string(),
                 help: note.to_string(),
+            }),
+            CoreError::AlreadyInitialized => Ok(RustyForgeDiagnostic::AlreadyInitialized { 
+                help: "Remove the `RustyForge.toml` file, or use `rustyforge init --force` to override the existing project".to_string() 
             }),
             _ => Err(()),
         }

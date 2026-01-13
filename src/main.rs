@@ -26,12 +26,17 @@ fn run() -> Result<(), RustyForgeReport> {
     with_shell(|sh| sh.set_verbosity(&cli.get_verbosity()));
 
     match &cli.command {
-        CliCommand::New { name, bin, lib } => {
-            create_new_rustyforge(name, *bin, *lib).map_err(RustyForgeReport::from)?;
+        CliCommand::New {
+            name,
+            bin,
+            lib,
+            force,
+        } => {
+            create_new_rustyforge(name, *bin, *lib, *force).map_err(RustyForgeReport::from)?;
             return Ok(());
         }
-        CliCommand::Init => {
-            initialize_new_rustyforge().map_err(RustyForgeReport::from)?;
+        CliCommand::Init { force } => {
+            initialize_new_rustyforge(*force).map_err(RustyForgeReport::from)?;
             return Ok(());
         }
         _ => {}

@@ -1,0 +1,10 @@
+[package]
+name = "multi-root-includes"
+version = "0.1.0"
+edition = "c11"
+
+[[bin]]
+name = "multi-root"
+entry = "main.c"
+
+[build]

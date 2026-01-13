@@ -1,0 +1,10 @@
+[package]
+name = "include-discovery"
+version = "0.1.0"
+edition = "c11"
+
+[[bin]]
+name = "discovery"
+entry = "main.c"
+
+[build]

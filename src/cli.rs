@@ -72,10 +72,16 @@ pub enum CliCommand {
         /// Use the library template (defaults static), conflicts with `--bin`
         #[arg(long)]
         lib: bool,
+
+        #[arg(long, short = 'f')]
+        force: bool,
     },
 
     /// Initialize a new project in this directory
-    Init,
+    Init {
+        #[arg(long, short = 'f')]
+        force: bool,
+    },
 }
 
 /// Options common to Build and Run commands

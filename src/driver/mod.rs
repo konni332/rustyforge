@@ -63,6 +63,7 @@ pub struct GlobalContext<'ctx> {
     pub config: RunTimeConfig<'ctx>,
     pool: Arc<ThreadPool>,
     cache: CacheFile<BuildCache>,
+    all_entries: Vec<&'ctx Path>,
 }
 
 impl<'ctx> GlobalContext<'ctx> {
@@ -79,11 +80,19 @@ impl<'ctx> GlobalContext<'ctx> {
                 .num_threads(config.meta.threads)
                 .build()?,
         );
-
+        let all_entries: Vec<&Path> = config
+            .targets
+            .iter()
+            .filter_map(|target| match target.kind {
+                TargetKind::Executable { entry } => Some(entry),
+                _ => None,
+            })
+            .collect();
         let cache_path = cwd.join("build").join("build.cache");
         let cache = CacheFile::new(cache_path)?;
 
         Ok(Self {
+            all_entries,
             cwd,
             config,
             pool,
@@ -197,16 +206,26 @@ impl<'ctx> GlobalContext<'ctx> {
     }
 
     fn compile(&mut self, target: &Target) -> CoreResult<CompileResult> {
-        let ignore = if let Some(patterns) = target.ignore.as_ref() {
-            let globs: Vec<Glob> = patterns
+        let mut globs: Vec<Glob> = if let Some(patterns) = target.ignore.as_ref() {
+            patterns
                 .iter()
                 .filter_map(|pat| Glob::new(pat).ok())
-                .collect();
-            Arc::new(GlobSet::new(globs)?)
+                .collect()
         } else {
-            let globs: Vec<Glob> = Vec::new();
-            Arc::new(GlobSet::new(globs)?)
+            vec![]
         };
+        for e in self.all_entries.iter() {
+            match &target.kind {
+                TargetKind::Executable { entry } if entry != e => {
+                    globs.push(Glob::new(&e.display().to_string())?)
+                }
+                TargetKind::Shared | TargetKind::Static => {
+                    globs.push(Glob::new(&e.display().to_string())?)
+                }
+                _ => {}
+            }
+        }
+        let ignore = Arc::new(GlobSet::new(globs)?);
         self.create_file_structure(target)?;
         let c_files = self.discover_c_files(ignore.clone());
         let cpp_files = self.discover_cpp_files(ignore.clone());

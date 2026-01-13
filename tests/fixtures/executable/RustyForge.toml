@@ -1,8 +1,10 @@
-dependencies = []
-
-[project]
+[package]
 name = "executable"
 version = "0.1.0"
+edition = "c11"
+
+[[bin]]
+name = "executable"
+entry = "main.c"
 
 [build]
-ignore_patterns = []

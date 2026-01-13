@@ -26,7 +26,13 @@ impl<I: CacheFileInner + Serialize + DeserializeOwned> CacheFile<I> {
             let src = std::fs::read(&path)?;
             postcard::from_bytes(&src)?
         } else {
-            I::new()
+            if let Some(dir) = path.as_ref().parent() {
+                std::fs::create_dir_all(dir)?;
+            }
+            let cache = I::new();
+            let bytes = postcard::to_allocvec(&cache)?;
+            std::fs::write(&path, bytes)?;
+            cache
         };
         let inner = RwLock::new(cache);
         Ok(Self {

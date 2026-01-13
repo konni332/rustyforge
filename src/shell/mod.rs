@@ -392,3 +392,10 @@ fn default_err_erase_line(shell: &mut Shell) {
         _ => (),
     }
 }
+
+impl Drop for Shell {
+    fn drop(&mut self) {
+        self.out().write_all("\n".as_bytes());
+        self.err().write_all("\n".as_bytes());
+    }
+}

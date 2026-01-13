@@ -1,7 +1,7 @@
 use std::process::ExitCode;
 
 use rustyforge_core::{
-    Cli, CliCommand, RunTimeConfig, RustyForgeReport, ToolConfig, manifest::Manifest, with_shell,
+    Cli, CliCommand, RustyForgeReport, ToolConfig, manifest::Manifest, with_shell,
 };
 
 use crate::execute::{
@@ -23,6 +23,7 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), RustyForgeReport> {
     let cli = Cli::create().map_err(RustyForgeReport::from)?;
+    with_shell(|sh| sh.set_verbosity(&cli.get_verbosity()));
 
     match &cli.command {
         CliCommand::New { name, bin, lib } => {
@@ -40,11 +41,8 @@ fn run() -> Result<(), RustyForgeReport> {
 
     let config = ToolConfig::resolve_config().map_err(RustyForgeReport::from)?;
 
-    let runtime_config =
-        RunTimeConfig::new(&cli, &manifest, &config).map_err(RustyForgeReport::from)?;
-
     if let CliCommand::Info { json } = &cli.command {
-        project_info(&runtime_config, *json).map_err(RustyForgeReport::from)?;
+        project_info(&cli, &manifest, &config, *json).map_err(RustyForgeReport::from)?;
         return Ok(());
     }
 

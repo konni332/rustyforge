@@ -101,7 +101,7 @@ impl ShellOut {
         write!(buffer, "{style}{status}{style:#}")?;
         match message {
             Some(msg) => writeln!(buffer, " {msg}")?,
-            None => write!(buffer, " ")?,
+            None => writeln!(buffer, "")?,
         }
         self.stderr().write_all(&buffer)?;
 
@@ -182,9 +182,9 @@ macro_rules! status {
 macro_rules! verbose {
     ($($arg:tt)*) => {
         let status = "Verbose".to_string();
-        let style = $crate::shell::ui::VERBOSE;
-        let msg = format!(format_args!($($arg)*));
-        drop($crate::with_shell(|sh| sh.print_verbose(status, Some(msg), style)));
+        let style = &$crate::shell::ui::VERBOSE;
+        let msg = format_args!($($arg)*);
+        drop($crate::with_shell(|sh| sh.print_verbose(&status, Some(&msg), style)));
     };
 }
 

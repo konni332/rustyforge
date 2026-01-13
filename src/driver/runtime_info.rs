@@ -1,18 +1,53 @@
+use serde::Serialize;
+
 use crate::{
     CoreResult, RunTimeConfig, TargetKind, ToolchainExecutable,
     driver::runtime::{Meta, Profile, RuntimeToolchain, Target},
 };
-use std::fmt::Write;
+use std::{fmt::Write, path::PathBuf};
 
-pub fn get_project_info_string(runtime_config: &RunTimeConfig) -> CoreResult<String> {
-    let mut info = String::new();
+#[derive(Debug, Serialize)]
+pub struct ProjectInfo<'i> {
+    pub config: &'i RunTimeConfig<'i>,
+    pub includes: Option<Vec<PathBuf>>,
+    pub c_sources: Option<Vec<PathBuf>>,
+    pub cpp_sources: Option<Vec<PathBuf>>,
+}
 
-    writeln!(info, "{}", meta_info(&runtime_config.meta))?;
-    writeln!(info, "{}", profile_info(&runtime_config.profile))?;
-    writeln!(info, "{}", target_info(&runtime_config.targets))?;
-    writeln!(info, "{}", toolchain_info(&runtime_config.toolchain))?;
+use std::fmt;
 
-    Ok(info)
+impl<'i> fmt::Display for ProjectInfo<'i> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let cfg = self.config;
+
+        writeln!(f, "{}", meta_info(&cfg.meta))?;
+        writeln!(f, "{}", profile_info(&cfg.profile))?;
+        writeln!(f, "{}", target_info(&cfg.targets))?;
+        writeln!(f, "{}", toolchain_info(&cfg.toolchain))?;
+
+        if let Some(includes) = &self.includes {
+            writeln!(f, "\nIncludes:")?;
+            for inc in includes {
+                writeln!(f, "  - {}", inc.display())?;
+            }
+        }
+
+        if let Some(c_sources) = &self.c_sources {
+            writeln!(f, "\nC Sources:")?;
+            for src in c_sources {
+                writeln!(f, "  - {}", src.display())?;
+            }
+        }
+
+        if let Some(cpp_sources) = &self.cpp_sources {
+            writeln!(f, "\nC++ Sources:")?;
+            for src in cpp_sources {
+                writeln!(f, "  - {}", src.display())?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 fn meta_info(meta: &Meta) -> String {

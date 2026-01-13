@@ -40,6 +40,7 @@ use crate::internal_error;
 use crate::status;
 use crate::success;
 use crate::utils::display_command;
+use crate::verbose;
 use crate::with_shell;
 use globset::Glob;
 use globset::GlobSet;
@@ -49,7 +50,7 @@ use rayon::ThreadPoolBuilder;
 use rayon::prelude::*;
 pub use runtime::RunTimeConfig;
 pub use runtime::TargetKind;
-pub use runtime_info::get_project_info_string;
+pub use runtime_info::ProjectInfo;
 use std::hash::{Hash, Hasher};
 
 pub struct GlobalContext<'ctx> {
@@ -109,6 +110,7 @@ impl<'ctx> GlobalContext<'ctx> {
                 self.cache.insert(hash, PathBuf::new());
             }
             let mut cmd = std::process::Command::from(ccmd);
+            verbose!("running {}", display_command(&cmd));
             let output = cmd.output()?;
             if !output.status.success() {
                 let diagnostic = RustyForgeDiagnostic::BuildCommandFail {
@@ -120,7 +122,6 @@ impl<'ctx> GlobalContext<'ctx> {
                 });
                 failed = true;
             }
-            std::thread::sleep(std::time::Duration::from_secs(1));
         }
         success!(&"Compiled".to_string());
         Ok(failed)

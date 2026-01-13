@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
+use globset::GlobSet;
 use rustyforge_core::{
-    Cli, CoreError, CoreResult, GlobalContext, RunTimeConfig, ToolConfig, get_project_info_string,
-    internal_error, manifest::Manifest, success,
+    Cli, CoreError, CoreResult, GlobalContext, ProjectInfo, ToolConfig, internal_error,
+    manifest::Manifest, shell::Verbosity, success, with_shell,
 };
 
 /// Initializes RustyForge project in the current directory
@@ -43,9 +46,29 @@ pub fn clean() -> CoreResult<()> {
     Ok(())
 }
 
-pub fn project_info(runtime_config: &RunTimeConfig, json: bool) -> CoreResult<()> {
+pub fn project_info(
+    cli: &Cli,
+    manifest: &Manifest,
+    config: &ToolConfig,
+    json: bool,
+) -> CoreResult<()> {
+    let ctx = GlobalContext::new(cli, manifest, config)?;
+    let mut info = ProjectInfo {
+        config: &ctx.config,
+        includes: None,
+        c_sources: None,
+        cpp_sources: None,
+    };
+    let verbosity = with_shell(|sh| sh.get_verbosity());
+    let ignore = Arc::new(GlobSet::empty());
+    if verbosity == Verbosity::Verbose {
+        info.includes = Some(ctx.discover_include_dirs(ignore.clone()));
+        info.c_sources = Some(ctx.discover_c_files(ignore.clone()));
+        info.cpp_sources = Some(ctx.discover_cpp_files(ignore));
+    }
+
     if json {
-        let str = match serde_json::to_string_pretty(runtime_config) {
+        let str = match serde_json::to_string_pretty(&info) {
             Ok(s) => s,
             Err(e) => {
                 // NOTE: The Runtime config layout is static and known. If it fails there is a
@@ -56,18 +79,6 @@ pub fn project_info(runtime_config: &RunTimeConfig, json: bool) -> CoreResult<()
 
         todo!("use json string somehow: {}", str);
     } else {
-        let info = match get_project_info_string(runtime_config) {
-            Ok(i) => i,
-            Err(boxed_err) => {
-                let error: CoreError = *boxed_err;
-                match error {
-                    CoreError::Fmt(e) => {
-                        internal_error!("{}", e);
-                    }
-                    other => return Err(Box::new(other)),
-                }
-            }
-        };
         println!("{info}");
     }
 

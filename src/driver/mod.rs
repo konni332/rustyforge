@@ -161,6 +161,7 @@ impl<'ctx> GlobalContext<'ctx> {
                 with_shell(|sh| sh.print_miette(&diagnostic));
                 return Ok(true);
             }
+            self.cache.insert(hash, PathBuf::new());
         }
 
         Ok(false)
@@ -174,9 +175,8 @@ impl<'ctx> GlobalContext<'ctx> {
 
             if self.cache.contains(hash) {
                 continue;
-            } else {
-                self.cache.insert(hash, PathBuf::new());
             }
+
             let mut cmd = std::process::Command::from(ccmd);
             verbose!("running {}", display_command(&cmd));
             let output = cmd.output()?;
@@ -189,6 +189,8 @@ impl<'ctx> GlobalContext<'ctx> {
                     sh.print_miette(&diagnostic);
                 });
                 failed = true;
+            } else {
+                self.cache.insert(hash, PathBuf::new());
             }
         }
         Ok(failed)

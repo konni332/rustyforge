@@ -228,8 +228,8 @@ impl ToolchainExecutable for CppCompilerKind {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum LinkerKind {
-    #[serde(rename = "ld")]
-    Ld,
+    #[serde(rename = "gcc")]
+    Gcc,
     #[serde(rename = "clang")]
     Clang,
     #[serde(rename = "link.exe")]
@@ -241,11 +241,11 @@ pub enum LinkerKind {
 impl ToolchainExecutable for LinkerKind {
     fn executable(&self) -> &'static str {
         match self {
-            LinkerKind::Ld => {
+            LinkerKind::Gcc => {
                 if cfg!(target_os = "windows") {
-                    "ld.exe"
+                    "gcc.exe"
                 } else {
-                    "ld"
+                    "gcc"
                 }
             }
             LinkerKind::Clang => {
@@ -270,7 +270,7 @@ impl ToolchainExecutable for LinkerKind {
         let candidates = [Self::Msvc, Self::Lld];
 
         #[cfg(not(target_os = "windows"))]
-        let candidates = [Self::Lld, Self::Ld, Self::Clang];
+        let candidates = [Self::Lld, Self::Gcc, Self::Clang];
 
         for candidate in candidates.iter() {
             if which::which(candidate.executable()).is_ok() {

@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use globset::GlobSet;
 use rustyforge_core::{
-    Cli, CoreError, CoreResult, GlobalContext, ProjectInfo, ToolConfig, internal_error,
-    manifest::Manifest, shell::Verbosity, success, with_shell,
+    Cli, CoreResult, GlobalContext, ProjectInfo, ToolConfig, internal_error, manifest::Manifest,
+    shell::Verbosity, success, with_shell,
 };
 
 /// Initializes RustyForge project in the current directory

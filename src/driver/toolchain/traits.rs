@@ -59,7 +59,7 @@ pub trait Linker {
         &self,
         target: &Target,
         profile: &Profile,
-        srcs: &[PathBuf],
+        objs: &[PathBuf],
         contains_cpp: bool,
         lib_dirs: &[PathBuf],
         output: &Path,
@@ -70,5 +70,5 @@ pub trait Archiver {
     fn new() -> Self
     where
         Self: Sized;
-    fn archiver_objects(&self, objs: &[PathBuf], output: PathBuf) -> CoreResult<CannonicalCommand>;
+    fn archiver_objects(&self, objs: &[PathBuf], output: &Path) -> CoreResult<CannonicalCommand>;
 }

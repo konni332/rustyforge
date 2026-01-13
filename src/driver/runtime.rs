@@ -261,3 +261,13 @@ fn resolve_targets<'a>(
     }
     Ok(targets)
 }
+
+impl<'a> std::fmt::Display for TargetKind<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            TargetKind::Static => write!(f, "static"),
+            TargetKind::Shared => write!(f, "shared"),
+            TargetKind::Executable { entry } => write!(f, "bin-{}", entry.display()),
+        }
+    }
+}

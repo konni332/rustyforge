@@ -61,6 +61,9 @@ pub enum CoreError {
 
     #[error("Build failed")]
     BuildFailed,
+
+    #[error("Not supported: {msg}")]
+    NotSupported { msg: String, note: String },
 }
 
 impl From<std::io::Error> for Box<CoreError> {

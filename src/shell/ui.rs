@@ -101,7 +101,7 @@ impl ShellOut {
         write!(buffer, "{style}{status}{style:#}")?;
         match message {
             Some(msg) => writeln!(buffer, " {msg}")?,
-            None => writeln!(buffer, "")?,
+            None => writeln!(buffer)?,
         }
         self.stderr().write_all(&buffer)?;
 

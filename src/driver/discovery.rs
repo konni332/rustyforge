@@ -1,12 +1,37 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use globset::GlobSet;
 
-use crate::driver::GlobalContext;
+use crate::driver::{GlobalContext, runtime::Target};
 
 impl<'ctx> GlobalContext<'ctx> {
+    pub fn discover_obj_files(&self, target: &Target) -> Vec<PathBuf> {
+        #[cfg(windows)]
+        let obj_ext = "obj";
+        #[cfg(not(windows))]
+        let obj_ext = "o";
+
+        let objs_dir = self.get_object_dir(target);
+        let walkdir =
+            self.create_entry_iter_ignore_subpackage(&objs_dir, Arc::new(GlobSet::empty()));
+        walkdir
+            .filter_map(|res| res.ok())
+            .filter_map(|entry| {
+                if entry.path().is_file()
+                    && entry.path().extension().is_some_and(|ext| ext == obj_ext)
+                {
+                    Some(entry.path().to_path_buf())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
     pub fn discover_c_files(&self, ignore: Arc<GlobSet>) -> Vec<PathBuf> {
-        let walkdir = self.create_entry_iter_ignore_subpackage(ignore);
+        let walkdir = self.create_entry_iter_ignore_subpackage(&self.cwd, ignore);
         let mut c_files: Vec<PathBuf> = walkdir
             .filter_map(|res| res.ok())
             .filter_map(|entry| {
@@ -23,7 +48,7 @@ impl<'ctx> GlobalContext<'ctx> {
         c_files
     }
     pub fn discover_cpp_files(&self, ignore: Arc<GlobSet>) -> Vec<PathBuf> {
-        let walkdir = self.create_entry_iter_ignore_subpackage(ignore);
+        let walkdir = self.create_entry_iter_ignore_subpackage(&self.cwd, ignore);
         let mut cpp_files: Vec<PathBuf> = walkdir
             .filter_map(|res| res.ok())
             .filter_map(|entry| {
@@ -44,7 +69,7 @@ impl<'ctx> GlobalContext<'ctx> {
         cpp_files
     }
     pub fn discover_include_dirs(&self, ignore: Arc<GlobSet>) -> Vec<PathBuf> {
-        let walkdir = self.create_entry_iter_ignore_subpackage(ignore);
+        let walkdir = self.create_entry_iter_ignore_subpackage(&self.cwd, ignore);
         let mut dirs: Vec<PathBuf> = walkdir
             .filter_map(|res| res.ok())
             .filter_map(|entry| {
@@ -62,9 +87,10 @@ impl<'ctx> GlobalContext<'ctx> {
     }
     fn create_entry_iter_ignore_subpackage(
         &self,
+        root: &Path,
         ignore: Arc<GlobSet>,
     ) -> jwalk::DirEntryIter<((), ())> {
-        jwalk::WalkDir::new(&self.cwd)
+        jwalk::WalkDir::new(root)
             .parallelism(jwalk::Parallelism::RayonExistingPool {
                 pool: self.pool.clone(),
                 busy_timeout: None,

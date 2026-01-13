@@ -33,11 +33,12 @@ impl<'ctx> GlobalContext<'ctx> {
     }
 }
 
+pub use fmt::format_output_file;
 mod fmt {
     use std::path::PathBuf;
 
     use crate::{TargetKind, driver::runtime::Target};
-    pub(super) fn format_output_file(target_kind: &TargetKind, name: &str) -> PathBuf {
+    pub fn format_output_file(target_kind: &TargetKind, name: &str) -> PathBuf {
         match target_kind {
             TargetKind::Static => format_static(name),
             TargetKind::Shared => format_shared(name),

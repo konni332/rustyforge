@@ -3,6 +3,7 @@ mod cache;
 mod cannonical_command;
 mod compiler;
 mod discovery;
+mod linker;
 mod runtime;
 mod runtime_info;
 mod toolchain;
@@ -23,11 +24,13 @@ use crate::config::Manifest;
 use crate::config::tool_config::CCompilerKind;
 use crate::config::tool_config::CppCompilerKind;
 use crate::diagnostics::RustyForgeDiagnostic;
+use crate::driver::archiver::ArchiverContext;
 use crate::driver::cache::BuildCache;
 use crate::driver::cache::CacheFile;
 use crate::driver::cannonical_command::CannonicalCommand;
 use crate::driver::compiler::CompileContext;
 use crate::driver::compiler::CompileResult;
+use crate::driver::linker::LinkContext;
 use crate::driver::runtime::Profile;
 use crate::driver::runtime::RuntimeToolchain;
 use crate::driver::runtime::Target;
@@ -37,6 +40,7 @@ use crate::driver::toolchain::CppCompiler;
 use crate::driver::toolchain::Gcc;
 use crate::driver::toolchain::Intel;
 use crate::driver::toolchain::Msvc;
+use crate::driver::utils::format_output_file;
 use crate::internal_error;
 use crate::status;
 use crate::success;
@@ -90,15 +94,78 @@ impl<'ctx> GlobalContext<'ctx> {
     pub fn build(&mut self) -> CoreResult<()> {
         for target in self.config.targets.clone() {
             let CompileResult { cmds, has_cpp } = self.compile(&target)?;
-            let failed = self.execute_build_commands(&cmds)?;
+            let failed = self.execute_compile_commands(&cmds)?;
             if failed {
                 return Err(Box::new(CoreError::BuildFailed));
             }
+            success!(&"Compiled", &format!("{}({})", &target.name, &target.kind));
+            let cmd = match target.kind {
+                TargetKind::Static => self.archive(&target)?,
+                TargetKind::Executable { entry } => self.link(&target, has_cpp)?,
+                TargetKind::Shared => self.link(&target, has_cpp)?,
+            };
+
+            let failed = self.execute_link_command(&cmd)?;
+            if failed {
+                return Err(Box::new(CoreError::BuildFailed));
+            }
+            success!(
+                &"Linked".to_string(),
+                &format!("{}({})", &target.name, &target.kind)
+            );
         }
+        success!(
+            &"Finished",
+            &format!("profile [{}]", &self.config.profile.name)
+        );
         Ok(())
     }
 
-    fn execute_build_commands(&self, ccmds: &[(CannonicalCommand, u64)]) -> CoreResult<bool> {
+    fn archive(&self, target: &Target) -> CoreResult<(CannonicalCommand, u64)> {
+        let objs = self.discover_obj_files(target);
+        let output = self.get_output_path(target);
+        let ctx = ArchiverContext::new(
+            &output,
+            self.cache.seed(),
+            &objs,
+            self.config.toolchain.archiver,
+        );
+        ctx.build()
+    }
+    fn link(&self, target: &Target, contains_cpp: bool) -> CoreResult<(CannonicalCommand, u64)> {
+        let objs = self.discover_obj_files(target);
+        let output = self.get_output_path(target);
+        let lib_dirs = vec![];
+        let ctx = LinkContext::new(
+            &objs,
+            contains_cpp,
+            &lib_dirs,
+            target,
+            &self.config.profile,
+            self.config.toolchain.linker,
+            self.cache.seed(),
+        );
+        ctx.build(&output)
+    }
+    fn execute_link_command(&self, cmd: &(CannonicalCommand, u64)) -> CoreResult<bool> {
+        let (ccmd, hash) = cmd;
+        if !self.cache.contains(hash) {
+            let mut cmd = std::process::Command::from(ccmd);
+            verbose!("running {}", display_command(&cmd));
+            let output = cmd.output()?;
+            if !output.status.success() {
+                let diagnostic = RustyForgeDiagnostic::BuildCommandFail {
+                    cmd: display_command(&cmd),
+                    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+                };
+                with_shell(|sh| sh.print_miette(&diagnostic));
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+    fn execute_compile_commands(&self, ccmds: &[(CannonicalCommand, u64)]) -> CoreResult<bool> {
         let mut failed = false;
         let mut pb = ProgressBar::new(ccmds.len());
         for (ccmd, hash) in ccmds {
@@ -124,7 +191,6 @@ impl<'ctx> GlobalContext<'ctx> {
                 failed = true;
             }
         }
-        success!(&"Compiled".to_string());
         Ok(failed)
     }
 
@@ -154,5 +220,10 @@ impl<'ctx> GlobalContext<'ctx> {
             &mut self.cache,
         );
         compile_ctx.build(&obj_dir)
+    }
+    fn output_path(&self, target: &Target) -> PathBuf {
+        let target_dir = self.get_target_dir(target);
+        let file = format_output_file(&target.kind, target.name);
+        target_dir.join(file)
     }
 }

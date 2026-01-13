@@ -74,6 +74,13 @@ pub enum RustyForgeDiagnostic {
 
     #[error("Build command failed:\n`{cmd}`\n{stderr}")]
     BuildCommandFail { cmd: String, stderr: String },
+
+    #[error("Not supported: {msg}")]
+    NotSupported {
+        msg: String,
+        #[help]
+        help: String,
+    },
 }
 
 impl From<CoreError> for RustyForgeReport {
@@ -131,6 +138,10 @@ impl TryFrom<&CoreError> for RustyForgeDiagnostic {
             CoreError::ToolChain { msg, help } => Ok(RustyForgeDiagnostic::Toolcahin {
                 help: msg.to_string(),
                 msg: msg.to_string(),
+            }),
+            CoreError::NotSupported { msg, note } => Ok(RustyForgeDiagnostic::NotSupported {
+                msg: msg.to_string(),
+                help: note.to_string(),
             }),
             _ => Err(()),
         }

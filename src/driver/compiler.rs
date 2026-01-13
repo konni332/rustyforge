@@ -56,9 +56,6 @@ impl<'ctx> CompileContext<'ctx> {
         }
     }
     pub fn build(&self, obj_dir: &Path) -> CoreResult<CompileResult> {
-        self.build_commands(obj_dir)
-    }
-    fn build_commands(&self, obj_dir: &Path) -> CoreResult<CompileResult> {
         let mut c_commands = match self.c_compiler {
             CCompilerKind::Clang => self.build_c_commands::<Clang>(obj_dir),
             CCompilerKind::Gcc => self.build_c_commands::<Gcc>(obj_dir),

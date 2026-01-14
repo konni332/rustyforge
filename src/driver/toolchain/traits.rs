@@ -4,6 +4,7 @@ use crate::{
     CoreResult, TargetKind,
     driver::{
         cannonical_command::{CannonicalCommand, CannonicalCommandBuilder},
+        compiler::Editions,
         runtime::{Profile, Target},
         toolchain::PROFILE_DEFINE_TEMPLATE,
     },
@@ -41,6 +42,7 @@ pub trait CCompiler: Send + Sync {
         profile: &Profile,
         target: &Target,
         includes: &[PathBuf],
+        editions: Editions,
     ) -> CoreResult<CannonicalCommand>;
 
     /// Resolves all header file dependencies for a given C source file.
@@ -55,6 +57,7 @@ pub trait CCompiler: Send + Sync {
         profile: &Profile,
         target: &Target,
         includes: &[PathBuf],
+        editions: Editions,
     ) -> CoreResult<Vec<PathBuf>>;
 }
 
@@ -81,6 +84,7 @@ pub trait CppCompiler: Send + Sync {
         profile: &Profile,
         target: &Target,
         includes: &[PathBuf],
+        editions: Editions,
     ) -> CoreResult<CannonicalCommand>;
 
     /// Resolves all header file dependencies for a given C++ source file.
@@ -93,6 +97,7 @@ pub trait CppCompiler: Send + Sync {
         profile: &Profile,
         target: &Target,
         includes: &[PathBuf],
+        editions: Editions,
     ) -> CoreResult<Vec<PathBuf>>;
 }
 

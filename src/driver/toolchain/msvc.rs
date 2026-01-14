@@ -4,6 +4,7 @@ use crate::{
     CoreResult, TargetKind,
     driver::{
         cannonical_command::{CannonicalCommand, CannonicalCommandBuilder},
+        compiler::Editions,
         runtime::Profile,
         toolchain::{
             PROFILE_DEFINE_TEMPLATE,
@@ -22,6 +23,7 @@ impl CCompiler for Msvc {
         profile: &crate::driver::runtime::Profile,
         target: &crate::driver::runtime::Target,
         includes: &[PathBuf],
+        editions: Editions,
     ) -> CoreResult<Vec<PathBuf>> {
         Ok(vec![])
     }
@@ -38,6 +40,7 @@ impl CCompiler for Msvc {
         profile: &crate::driver::runtime::Profile,
         target: &crate::driver::runtime::Target,
         includes: &[PathBuf],
+        editions: Editions,
     ) -> crate::CoreResult<crate::driver::cannonical_command::CannonicalCommand> {
         if path.extension().and_then(|e| e.to_str()) != Some("c") {
             internal_error!("Msvc C Compiler received non-C file");
@@ -48,7 +51,8 @@ impl CCompiler for Msvc {
         cmd.arg("/c")
             .arg("/TC")
             .arg(path)
-            .arg(format!("/Fo:{}", output.display()));
+            .arg(format!("/Fo:{}", output.display()))
+            .arg(format!("/std:{}", editions.cpp_edition));
 
         let opt_flag = match profile.opt_level {
             0 => "/Od",
@@ -98,6 +102,7 @@ impl CppCompiler for Msvc {
         profile: &crate::driver::runtime::Profile,
         target: &crate::driver::runtime::Target,
         includes: &[PathBuf],
+        editions: Editions,
     ) -> CoreResult<Vec<PathBuf>> {
         Ok(vec![])
     }
@@ -108,6 +113,7 @@ impl CppCompiler for Msvc {
         profile: &crate::driver::runtime::Profile,
         target: &crate::driver::runtime::Target,
         includes: &[PathBuf],
+        editions: Editions,
     ) -> crate::CoreResult<crate::driver::cannonical_command::CannonicalCommand> {
         if !matches!(
             path.extension().and_then(|e| e.to_str()),
@@ -121,7 +127,8 @@ impl CppCompiler for Msvc {
         cmd.arg("/c")
             .arg("/TP")
             .arg(path)
-            .arg(format!("/Fo:{}", output.display()));
+            .arg(format!("/Fo:{}", output.display()))
+            .arg(format!("/std:{}", editions.cpp_edition));
 
         let opt_flag = match profile.opt_level {
             0 => "/Od",

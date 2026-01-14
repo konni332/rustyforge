@@ -27,7 +27,8 @@ pub struct Meta<'a> {
     pub name: &'a str,
     pub version: &'a str,
     pub threads: usize,
-    pub edition: &'a str,
+    pub c_edition: &'a str,
+    pub cpp_edition: &'a str,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -89,7 +90,8 @@ fn resolve_meta<'a>(
 ) -> CoreResult<Meta<'a>> {
     let name = &manifest.package.name;
     let version = &manifest.package.version;
-    let edition = &manifest.package.edition;
+    let c_edition = &manifest.package.c_edition;
+    let cpp_edition = &manifest.package.cpp_edition;
     let threads = cli
         .threads()
         .unwrap_or(
@@ -104,7 +106,8 @@ fn resolve_meta<'a>(
     Ok(Meta {
         name,
         version,
-        edition,
+        c_edition,
+        cpp_edition,
         threads,
     })
 }

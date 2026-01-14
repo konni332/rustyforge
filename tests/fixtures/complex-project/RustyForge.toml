@@ -1,7 +1,9 @@
 [package]
 name = "complex-project"
 version = "0.1.0"
-edition = "c11"
+c-edition = "c11"
+cpp-edition = "c++17"
+
 
 [[bin]]
 name = "bin-a"

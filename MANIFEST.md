@@ -12,7 +12,8 @@ The `[package]` section describes metadata about your project.
 [package]
 name = "example"          # required
 version = "0.1.0"         # required
-edition = "c11"           # required, e.g., c89, c99, c11, c17, c23
+c-edition = "c11"         # required, e.g., c89, c99, c11, c17, c23
+cpp-edition = "c++17"     # required, e.g., c++17, c++20, c++latest
 authors = ["Your Name"]   # optional
 license = "MIT"           # optional
 description = "A short description of your project"  # optional

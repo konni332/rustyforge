@@ -30,20 +30,37 @@ pub struct CompileContext<'ctx> {
     target: &'ctx Target<'ctx>,
     profile: &'ctx Profile,
     build_cache: &'ctx mut CacheFile<BuildCache>,
+    editions: Editions<'ctx>,
+}
+
+pub struct Sources<'ctx> {
+    pub includes: &'ctx [PathBuf],
+    pub c_files: &'ctx [PathBuf],
+    pub cpp_files: &'ctx [PathBuf],
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Editions<'ctx> {
+    pub c_edition: &'ctx str,
+    pub cpp_edition: &'ctx str,
 }
 
 impl<'ctx> CompileContext<'ctx> {
     pub fn new(
-        includes: &'ctx [PathBuf],
-        c_files: &'ctx [PathBuf],
-        cpp_files: &'ctx [PathBuf],
+        sources: Sources<'ctx>,
         target: &'ctx Target<'ctx>,
         profile: &'ctx Profile,
         toolchain: &'ctx RuntimeToolchain,
         build_cache: &'ctx mut CacheFile<BuildCache>,
+        editions: Editions<'ctx>,
     ) -> Self {
         let c_compiler = toolchain.c_compiler;
         let cpp_compiler = toolchain.cpp_compiler;
+        let Sources {
+            includes,
+            c_files,
+            cpp_files,
+        } = sources;
         Self {
             c_compiler,
             cpp_compiler,
@@ -53,6 +70,7 @@ impl<'ctx> CompileContext<'ctx> {
             target,
             profile,
             build_cache,
+            editions,
         }
     }
     pub fn build(&self, obj_dir: &Path) -> CoreResult<CompileResult> {
@@ -81,12 +99,23 @@ impl<'ctx> CompileContext<'ctx> {
         let mut results = vec![];
         let comp = C::new();
         for src in self.c_files {
-            let dependencies =
-                comp.get_dependencies(src, self.profile, self.target, self.includes)?;
+            let dependencies = comp.get_dependencies(
+                src,
+                self.profile,
+                self.target,
+                self.includes,
+                self.editions,
+            )?;
 
             let output = output(src, obj_dir);
-            let cmd =
-                comp.compile_unit_cmd(src, &output, self.profile, self.target, self.includes)?;
+            let cmd = comp.compile_unit_cmd(
+                src,
+                &output,
+                self.profile,
+                self.target,
+                self.includes,
+                self.editions,
+            )?;
             let hash = get_tu_hash(src, &cmd, &dependencies, self.build_cache.seed())?;
             results.push((cmd, hash));
         }
@@ -99,12 +128,23 @@ impl<'ctx> CompileContext<'ctx> {
         let mut results = vec![];
         let comp = C::new();
         for src in self.cpp_files {
-            let dependencies =
-                comp.get_dependencies(src, self.profile, self.target, self.includes)?;
+            let dependencies = comp.get_dependencies(
+                src,
+                self.profile,
+                self.target,
+                self.includes,
+                self.editions,
+            )?;
 
             let output = output(src, obj_dir);
-            let cmd =
-                comp.compile_unit_cmd(src, &output, self.profile, self.target, self.includes)?;
+            let cmd = comp.compile_unit_cmd(
+                src,
+                &output,
+                self.profile,
+                self.target,
+                self.includes,
+                self.editions,
+            )?;
             let hash = get_tu_hash(src, &cmd, &dependencies, self.build_cache.seed())?;
             results.push((cmd, hash));
         }

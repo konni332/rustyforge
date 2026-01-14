@@ -9,6 +9,8 @@ use crate::error::CoreResult;
 
 /// Default C language edition used when no explicit edition is specified.
 const DEFAULT_C_EDITION: &str = "c11";
+/// Default Cpp language edition used when no explicit edition is specified.
+const DEFAULT_CPP_EDITION: &str = "c++17";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Manifest {
@@ -24,7 +26,10 @@ pub struct Manifest {
 pub struct Package {
     pub name: String,
     pub version: String,
-    pub edition: String,
+    #[serde(rename = "c-edition")]
+    pub c_edition: String,
+    #[serde(rename = "cpp-edition")]
+    pub cpp_edition: String,
     pub authors: Option<Vec<String>>,
     pub license: Option<String>,
     pub description: Option<String>,
@@ -118,7 +123,8 @@ impl Default for Package {
         Self {
             name: "<default>".into(),
             version: "0.1.0".into(),
-            edition: DEFAULT_C_EDITION.into(),
+            c_edition: DEFAULT_C_EDITION.into(),
+            cpp_edition: DEFAULT_CPP_EDITION.into(),
             authors: None,
             license: None,
             description: None,

@@ -7,6 +7,7 @@ use crate::{
     CoreError, CoreResult, TargetKind,
     driver::{
         cannonical_command::{CannonicalCommand, CannonicalCommandBuilder},
+        compiler::Editions,
         runtime::Profile,
         toolchain::{
             PROFILE_DEFINE_TEMPLATE,
@@ -38,10 +39,13 @@ impl CCompiler for Gcc {
         profile: &crate::driver::runtime::Profile,
         target: &crate::driver::runtime::Target,
         includes: &[PathBuf],
+        editions: Editions,
     ) -> CoreResult<Vec<PathBuf>> {
         let executable = if cfg!(windows) { "gcc.exe" } else { "gcc" };
         let mut cmd = CannonicalCommandBuilder::new(executable);
-        cmd.arg("-MM").arg(src);
+        cmd.arg("-MM")
+            .arg(src)
+            .arg(format!("-std={}", editions.c_edition));
         let cmd = build_command_compile(src, cmd, profile, target, includes)?;
         let output = Command::from(&cmd).output()?;
 
@@ -89,6 +93,7 @@ impl CCompiler for Gcc {
         profile: &crate::driver::runtime::Profile,
         target: &crate::driver::runtime::Target,
         includes: &[PathBuf],
+        editions: Editions,
     ) -> crate::CoreResult<crate::driver::cannonical_command::CannonicalCommand> {
         if path.extension().and_then(|e| e.to_str()) != Some("c") {
             internal_error!("Gcc C Compiler received non-C file");
@@ -96,7 +101,11 @@ impl CCompiler for Gcc {
         let executable = if cfg!(windows) { "gcc.exe" } else { "gcc" };
         let mut cmd = CannonicalCommandBuilder::new(executable);
 
-        cmd.arg("-c").arg(path).arg("-o").arg(output);
+        cmd.arg("-c")
+            .arg(path)
+            .arg("-o")
+            .arg(output)
+            .arg(format!("-std={}", editions.c_edition));
 
         build_command_compile(path, cmd, profile, target, includes)
     }
@@ -115,10 +124,13 @@ impl CppCompiler for Gcc {
         profile: &crate::driver::runtime::Profile,
         target: &crate::driver::runtime::Target,
         includes: &[PathBuf],
+        editions: Editions,
     ) -> CoreResult<Vec<PathBuf>> {
         let executable = if cfg!(windows) { "g++.exe" } else { "g++" };
         let mut cmd = CannonicalCommandBuilder::new(executable);
-        cmd.arg("-MM").arg(src);
+        cmd.arg("-MM")
+            .arg(src)
+            .arg(format!("-std={}", editions.cpp_edition));
         let cmd = build_command_compile(src, cmd, profile, target, includes)?;
         let output = Command::from(&cmd).output()?;
 
@@ -166,6 +178,7 @@ impl CppCompiler for Gcc {
         profile: &crate::driver::runtime::Profile,
         target: &crate::driver::runtime::Target,
         includes: &[PathBuf],
+        editions: Editions,
     ) -> crate::CoreResult<crate::driver::cannonical_command::CannonicalCommand> {
         if !matches!(
             path.extension().and_then(|e| e.to_str()),
@@ -176,7 +189,11 @@ impl CppCompiler for Gcc {
         let executable = if cfg!(windows) { "g++.exe" } else { "g++" };
         let mut cmd = CannonicalCommandBuilder::new(executable);
 
-        cmd.arg("-c").arg(path).arg("-o").arg(output);
+        cmd.arg("-c")
+            .arg(path)
+            .arg("-o")
+            .arg(output)
+            .arg(format!("-std={}", editions.cpp_edition));
 
         build_command_compile(path, cmd, profile, target, includes)
     }

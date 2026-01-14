@@ -52,8 +52,8 @@ impl<'i> fmt::Display for ProjectInfo<'i> {
 
 fn meta_info(meta: &Meta) -> String {
     format!(
-        "\nProject Meta:\n  Name: {}\n  Version: {}\n  Edition: {}\n  Threads: {}",
-        meta.name, meta.version, meta.edition, meta.threads
+        "\nProject Meta:\n  Name: {}\n  Version: {}\n  C Edition: {}\n  Cpp Edition: {}\n  Threads: {}",
+        meta.name, meta.version, meta.c_edition, meta.cpp_edition, meta.threads
     )
 }
 

@@ -33,6 +33,8 @@ use crate::driver::cache::CacheFile;
 use crate::driver::cannonical_command::CannonicalCommand;
 use crate::driver::compiler::CompileContext;
 use crate::driver::compiler::CompileResult;
+use crate::driver::compiler::Editions;
+use crate::driver::compiler::Sources;
 use crate::driver::linker::LinkContext;
 use crate::driver::runtime::Profile;
 use crate::driver::runtime::RuntimeToolchain;
@@ -318,14 +320,23 @@ impl<'ctx> GlobalContext<'ctx> {
         let cpp_files = self.discover_cpp_files(ignore.clone());
         let includes = self.discover_include_dirs(ignore.clone());
         let obj_dir = self.get_object_dir(target);
+
+        let sources = Sources {
+            c_files: &c_files,
+            cpp_files: &cpp_files,
+            includes: &includes,
+        };
+        let editions = Editions {
+            c_edition: self.config.meta.c_edition,
+            cpp_edition: self.config.meta.cpp_edition,
+        };
         let compile_ctx = CompileContext::new(
-            &includes,
-            &c_files,
-            &cpp_files,
+            sources,
             target,
             &self.config.profile,
             &self.config.toolchain,
             &mut self.cache,
+            editions,
         );
         compile_ctx.build(&obj_dir)
     }

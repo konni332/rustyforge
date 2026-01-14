@@ -1,7 +1,9 @@
 [package]
 name = "include-discovery"
 version = "0.1.0"
-edition = "c11"
+c-edition = "c11"
+cpp-edition = "c++17"
+
 
 [[bin]]
 name = "discovery"

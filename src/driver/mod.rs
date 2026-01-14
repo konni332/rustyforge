@@ -195,8 +195,6 @@ impl<'ctx> GlobalContext<'ctx> {
         Ok(false)
     }
     fn execute_compile_commands(&self, ccmds: &[(CannonicalCommand, u64)]) -> CoreResult<bool> {
-        use std::sync::atomic::{AtomicBool, Ordering};
-
         let failed = AtomicBool::new(false);
 
         self.pool.install(|| {
@@ -231,6 +229,9 @@ impl<'ctx> GlobalContext<'ctx> {
                         sh.print_miette(&diagnostic);
                     });
                 } else {
+                    if !output.stderr.is_empty() {
+                        with_shell(|sh| drop(sh.err().write_all(&output.stderr)));
+                    }
                     self.cache.insert(hash, PathBuf::new());
                 }
             });

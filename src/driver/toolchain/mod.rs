@@ -11,4 +11,4 @@ pub use msvc::Msvc;
 
 pub use traits::{Archiver, CCompiler, CppCompiler, Linker};
 
-pub const PROFILE_DEFINE_TEMPLATE: &str = "RF_PROFIL_";
+pub const PROFILE_DEFINE_TEMPLATE: &str = "RF_PROFILE_";

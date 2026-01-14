@@ -12,10 +12,14 @@ ignore = ["tests"]
 name = "bin-b"
 entry = "src/main.cpp"
 ignore = ["tests"]
+defines = ["CUSTOM_DEFINE"]
 
 [lib]
 type = "shared"
 name = "mylib"
 ignore = ["src", "tests"]
+
+[profile.dev]
+flags = ["-Wall", "-Wextra"]
 
 [build]

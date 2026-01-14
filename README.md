@@ -68,16 +68,16 @@ For a full reference, see the following documents:
 
 ## Examples
 
-# Build a release binary
+### Build a release binary
 rustyforge build --release --bin example
 
-# Run a binary with arguments
+### Run a binary with arguments
 rustyforge run --release --bin example -- -p 8080
 
-# Clean the build directory
+### Clean the build directory
 rustyforge clean
 
-# Display project info in JSON
+### Display project info in JSON
 rustyforge info --json
 
 ---

@@ -103,13 +103,14 @@ impl<'ctx> GlobalContext<'ctx> {
         root: &Path,
         ignore: Arc<GlobSet>,
     ) -> jwalk::DirEntryIter<((), ())> {
-        jwalk::WalkDir::new(root)
+        let root = root.canonicalize().unwrap_or(root.to_path_buf());
+        jwalk::WalkDir::new(&root)
             .parallelism(jwalk::Parallelism::RayonExistingPool {
                 pool: self.pool.clone(),
                 busy_timeout: None,
             })
             .process_read_dir(move |depth, dir_path, _state, children| {
-                if ignore.is_match(dir_path) {
+                if ignore.is_match(to_relative(&root, dir_path)) {
                     children.clear();
                     return;
                 }
@@ -128,7 +129,7 @@ impl<'ctx> GlobalContext<'ctx> {
                 }
                 children.retain(|res| {
                     res.as_ref()
-                        .is_ok_and(|child| !ignore.is_match(child.path()))
+                        .is_ok_and(|child| !ignore.is_match(to_relative(&root, &child.path())))
                 });
             })
             .into_iter()
@@ -145,4 +146,8 @@ fn sort_include_dirs(dirs: &mut [PathBuf]) {
             a.as_os_str().cmp(b.as_os_str())
         }
     });
+}
+
+fn to_relative<'a>(cwd: &Path, path: &'a Path) -> &'a Path {
+    path.strip_prefix(cwd).unwrap_or(path)
 }

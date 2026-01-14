@@ -214,17 +214,28 @@ impl<'ctx> GlobalContext<'ctx> {
         } else {
             vec![]
         };
-        for e in self.all_entries.iter() {
-            match &target.kind {
-                TargetKind::Executable { entry } if entry != e => {
-                    globs.push(Glob::new(&e.display().to_string())?)
+
+        match &target.kind {
+            TargetKind::Executable { entry } => {
+                let entry = Path::new(entry);
+
+                for e in &self.all_entries {
+                    let rel = e.strip_prefix(&self.cwd).unwrap_or(e);
+
+                    if rel != entry {
+                        globs.push(Glob::new(rel.to_string_lossy().as_ref())?);
+                    }
                 }
-                TargetKind::Shared | TargetKind::Static => {
-                    globs.push(Glob::new(&e.display().to_string())?)
+            }
+
+            TargetKind::Shared | TargetKind::Static => {
+                for e in &self.all_entries {
+                    let rel = e.strip_prefix(&self.cwd).unwrap_or(e);
+                    globs.push(Glob::new(rel.to_string_lossy().as_ref())?);
                 }
-                _ => {}
             }
         }
+
         let ignore = Arc::new(GlobSet::new(globs)?);
         self.create_file_structure(target)?;
         let c_files = self.discover_c_files(ignore.clone());

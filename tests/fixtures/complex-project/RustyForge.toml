@@ -3,15 +3,11 @@ name = "complex-project"
 version = "0.1.0"
 edition = "c11"
 
-[[bin]]
-name = "bin-a"
-entry = "src/main.c"
-ignore = ["libs", "tests"]
 
 [[bin]]
 name = "bin-b"
 entry = "src/main.cpp"
-ignore = ["libs", "tests"]
+ignore = ["tests"]
 
 [lib]
 type = "shared"

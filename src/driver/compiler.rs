@@ -68,7 +68,6 @@ impl<'ctx> CompileContext<'ctx> {
             CppCompilerKind::Msvc => self.build_cpp_commands::<Msvc>(obj_dir),
             CppCompilerKind::Icc => self.build_cpp_commands::<Intel>(obj_dir),
         }?;
-
         c_commands.extend(cpp_commands);
         Ok(CompileResult {
             cmds: c_commands,
@@ -97,9 +96,19 @@ impl<'ctx> CompileContext<'ctx> {
         &self,
         obj_dir: &Path,
     ) -> CoreResult<Vec<(CannonicalCommand, u64)>> {
-        let mut cmds = vec![];
+        let mut results = vec![];
+        let comp = C::new();
+        for src in self.cpp_files {
+            let dependencies =
+                comp.get_dependencies(src, self.profile, self.target, self.includes)?;
 
-        Ok(cmds)
+            let output = output(src, obj_dir);
+            let cmd =
+                comp.compile_unit_cmd(src, &output, self.profile, self.target, self.includes)?;
+            let hash = get_tu_hash(src, &cmd, &dependencies, self.build_cache.seed())?;
+            results.push((cmd, hash));
+        }
+        Ok(results)
     }
 }
 

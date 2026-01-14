@@ -19,9 +19,9 @@ impl<'ctx> GlobalContext<'ctx> {
     pub fn get_target_dir(&self, target: &Target) -> PathBuf {
         let base = self.get_profile_dir();
         base.join(match target.kind {
-            TargetKind::Static => "static",
-            TargetKind::Shared => "shared",
-            TargetKind::Executable { .. } => "bin",
+            TargetKind::Static => "static".to_string(),
+            TargetKind::Shared => "shared".to_string(),
+            TargetKind::Executable { .. } => format!("bin-{}", target.name),
         })
     }
     pub fn get_object_dir(&self, target: &Target) -> PathBuf {

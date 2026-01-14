@@ -1,9 +1,9 @@
 #include <iostream>
 #include <api/api.h>
 #include "shared/shared.h"
-#include "libs/log/log.hpp"
+#include "log/log.hpp"
 
-int main() {
+int main(void) {
     std::cout << "C++ app\n";
     std::cout << "API origin: " << API_ORIGIN << std::endl;
 

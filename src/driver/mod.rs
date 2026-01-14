@@ -69,7 +69,17 @@ pub struct GlobalContext<'ctx> {
     all_entries: Vec<&'ctx Path>,
 }
 
+/// Global build context holding resolved configuration, toolchain state,
+/// thread pool, and build cache.
+///
+/// This type orchestrates the full build lifecycle: compilation, linking,
+/// caching, and diagnostics emission.
 impl<'ctx> GlobalContext<'ctx> {
+    /// Create a new `GlobalContext` from CLI arguments, manifest, and tool configuration.
+    ///
+    /// This resolves the runtime configuration, initializes the thread pool,
+    /// loads the build cache, and precomputes executable entry points used
+    /// for target filtering.
     pub fn new(
         cli: &'ctx Cli,
         manifest: &'ctx Manifest,
@@ -103,6 +113,11 @@ impl<'ctx> GlobalContext<'ctx> {
         })
     }
 
+    /// Build all configured targets using the selected profile.
+    ///
+    /// This performs compilation and linking for each target in order,
+    /// stopping early if any step fails. Successful builds populate the
+    /// returned `BuildResult` with produced artifacts.
     pub fn build(&mut self) -> CoreResult<BuildResult> {
         let mut res = BuildResult {
             exe_paths: HashMap::new(),
@@ -145,6 +160,10 @@ impl<'ctx> GlobalContext<'ctx> {
         Ok(res)
     }
 
+    /// Archive object files into a static library target.
+    ///
+    /// This constructs an archiver command based on the resolved toolchain
+    /// and returns the command together with the output path.
     fn archive(&self, target: &Target) -> CoreResult<((CannonicalCommand, u64), PathBuf)> {
         let objs = self.discover_obj_files(target);
         let output = self.get_output_path(target);
@@ -156,6 +175,10 @@ impl<'ctx> GlobalContext<'ctx> {
         );
         Ok((ctx.build()?, output))
     }
+    /// Link object files into an executable or shared library.
+    ///
+    /// The selected linker depends on the toolchain and whether any C++
+    /// translation units are present.
     fn link(
         &self,
         target: &Target,
@@ -175,6 +198,11 @@ impl<'ctx> GlobalContext<'ctx> {
         );
         Ok((ctx.build(&output)?, output))
     }
+
+    /// Execute a single link command if it is not cached.
+    ///
+    /// Returns `true` if the command failed, otherwise `false`.
+    /// On failure, a diagnostic is emitted to the shell.
     fn execute_link_command(&self, cmd: &(CannonicalCommand, u64)) -> CoreResult<bool> {
         let (ccmd, hash) = cmd;
         if !self.cache.contains(hash) {
@@ -194,6 +222,14 @@ impl<'ctx> GlobalContext<'ctx> {
 
         Ok(false)
     }
+
+    /// Execute all compilation commands in parallel.
+    ///
+    /// Commands are skipped if present in the build cache. Compilation
+    /// is executed using the internal thread pool, and diagnostics are
+    /// emitted immediately on failure.
+    ///
+    /// Returns `true` if any compilation failed.
     fn execute_compile_commands(&self, ccmds: &[(CannonicalCommand, u64)]) -> CoreResult<bool> {
         let failed = AtomicBool::new(false);
 
@@ -239,6 +275,12 @@ impl<'ctx> GlobalContext<'ctx> {
 
         Ok(failed.load(Ordering::SeqCst))
     }
+
+    /// Compile all source files for a given target.
+    ///
+    /// This performs source discovery, applies ignore rules, resolves
+    /// include directories, and generates compilation commands for both
+    /// C and C++ sources.
     fn compile(&mut self, target: &Target) -> CoreResult<CompileResult> {
         let mut globs: Vec<Glob> = if let Some(patterns) = target.ignore.as_ref() {
             patterns
@@ -287,6 +329,11 @@ impl<'ctx> GlobalContext<'ctx> {
         );
         compile_ctx.build(&obj_dir)
     }
+
+    /// Compute the final output path for a target.
+    ///
+    /// The resulting path depends on the target kind (executable, static,
+    /// or shared library) and the active build profile.
     fn output_path(&self, target: &Target) -> PathBuf {
         let target_dir = self.get_target_dir(target);
         let file = format_output_file(&target.kind, target.name);

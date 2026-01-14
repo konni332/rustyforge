@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::CoreResult;
 
+/// Default C language edition used when no explicit edition is specified.
 const DEFAULT_C_EDITION: &str = "c11";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

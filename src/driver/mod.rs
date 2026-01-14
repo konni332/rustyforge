@@ -10,6 +10,7 @@ mod toolchain;
 mod toolchain_resolve;
 mod utils;
 
+use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -100,7 +101,11 @@ impl<'ctx> GlobalContext<'ctx> {
         })
     }
 
-    pub fn build(&mut self) -> CoreResult<()> {
+    pub fn build(&mut self) -> CoreResult<BuildResult> {
+        let mut res = BuildResult {
+            exe_paths: HashMap::new(),
+            lib_path: None,
+        };
         for target in self.config.targets.clone() {
             let CompileResult { cmds, has_cpp } = self.compile(&target)?;
             let failed = self.execute_compile_commands(&cmds)?;
@@ -108,7 +113,7 @@ impl<'ctx> GlobalContext<'ctx> {
                 return Err(Box::new(CoreError::BuildFailed));
             }
             success!(&"Compiled", &format!("{}({})", &target.name, &target.kind));
-            let cmd = match target.kind {
+            let (cmd, output) = match target.kind {
                 TargetKind::Static => self.archive(&target)?,
                 TargetKind::Executable { entry } => self.link(&target, has_cpp)?,
                 TargetKind::Shared => self.link(&target, has_cpp)?,
@@ -122,15 +127,23 @@ impl<'ctx> GlobalContext<'ctx> {
                 &"Linked".to_string(),
                 &format!("{}({})", &target.name, &target.kind)
             );
+            match target.kind {
+                TargetKind::Executable { .. } => {
+                    res.exe_paths.insert(target.name.to_string(), output);
+                }
+                TargetKind::Static | TargetKind::Shared => {
+                    res.lib_path = Some(output);
+                }
+            }
         }
         success!(
             &"Finished",
             &format!("profile [{}]", &self.config.profile.name)
         );
-        Ok(())
+        Ok(res)
     }
 
-    fn archive(&self, target: &Target) -> CoreResult<(CannonicalCommand, u64)> {
+    fn archive(&self, target: &Target) -> CoreResult<((CannonicalCommand, u64), PathBuf)> {
         let objs = self.discover_obj_files(target);
         let output = self.get_output_path(target);
         let ctx = ArchiverContext::new(
@@ -139,9 +152,13 @@ impl<'ctx> GlobalContext<'ctx> {
             &objs,
             self.config.toolchain.archiver,
         );
-        ctx.build()
+        Ok((ctx.build()?, output))
     }
-    fn link(&self, target: &Target, contains_cpp: bool) -> CoreResult<(CannonicalCommand, u64)> {
+    fn link(
+        &self,
+        target: &Target,
+        contains_cpp: bool,
+    ) -> CoreResult<((CannonicalCommand, u64), PathBuf)> {
         let objs = self.discover_obj_files(target);
         let output = self.get_output_path(target);
         let lib_dirs = vec![];
@@ -154,7 +171,7 @@ impl<'ctx> GlobalContext<'ctx> {
             self.config.toolchain.linker,
             self.cache.seed(),
         );
-        ctx.build(&output)
+        Ok((ctx.build(&output)?, output))
     }
     fn execute_link_command(&self, cmd: &(CannonicalCommand, u64)) -> CoreResult<bool> {
         let (ccmd, hash) = cmd;
@@ -258,4 +275,9 @@ impl<'ctx> GlobalContext<'ctx> {
         let file = format_output_file(&target.kind, target.name);
         target_dir.join(file)
     }
+}
+
+pub struct BuildResult {
+    pub exe_paths: HashMap<String, PathBuf>,
+    pub lib_path: Option<PathBuf>,
 }

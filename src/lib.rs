@@ -22,6 +22,7 @@ pub use config::ToolConfig;
 pub use config::ToolchainExecutable;
 pub use config::manifest;
 pub use diagnostics::RustyForgeReport;
+pub use driver::BuildResult;
 pub use driver::GlobalContext;
 pub use driver::ProjectInfo;
 pub use driver::RunTimeConfig;

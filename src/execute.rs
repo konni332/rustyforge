@@ -1,9 +1,9 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use globset::GlobSet;
 use rustyforge_core::{
-    Cli, CoreError, CoreResult, GlobalContext, ProjectInfo, ToolConfig, internal_error,
-    manifest::Manifest, shell::Verbosity, success, with_shell,
+    BuildResult, Cli, CliCommand, CoreError, CoreResult, GlobalContext, ProjectInfo, ToolConfig,
+    internal_error, manifest::Manifest, shell::Verbosity, success, with_shell,
 };
 
 /// Initializes RustyForge project in the current directory
@@ -91,7 +91,49 @@ pub fn project_info(
     Ok(())
 }
 
-pub fn build(cli: &Cli, manifest: &Manifest, config: &ToolConfig) -> CoreResult<()> {
+pub fn build(cli: &Cli, manifest: &Manifest, config: &ToolConfig) -> CoreResult<BuildResult> {
     let mut ctx = GlobalContext::new(cli, manifest, config)?;
     ctx.build()
+}
+
+pub fn run(cli: &Cli, build_res: &BuildResult, manifest: &Manifest) -> CoreResult<()> {
+    let (mut cmd, executable) = match &cli.command {
+        CliCommand::Run { args, exe, .. } => {
+            let executable = determine_executable(exe, build_res, manifest)?;
+            let mut cmd = std::process::Command::new(&executable);
+            cmd.args(args);
+            (cmd, executable)
+        }
+        _ => {
+            internal_error!("run was executed but cli did not contain run command");
+        }
+    };
+
+    success!(&"Running", &executable.display());
+    cmd.status()?;
+    Ok(())
+}
+
+fn determine_executable(
+    bin: &Option<String>,
+    build_res: &BuildResult,
+    manifest: &Manifest,
+) -> CoreResult<PathBuf> {
+    let path = if let Some(bin_name) = bin {
+        build_res.exe_paths.get(bin_name)
+    } else {
+        let first_in_manifest = manifest.bin.as_ref().and_then(|bins| bins.first());
+        if let Some(first) = first_in_manifest {
+            build_res.exe_paths.get(&first.name)
+        } else {
+            return Err(Box::new(CoreError::NoExeFound));
+        }
+    };
+    if let Some(path) = path {
+        Ok(path.to_path_buf())
+    } else {
+        Err(Box::new(CoreError::ExeNotFound {
+            name: bin.as_ref().map(|s| s.as_str()).unwrap_or("any").into(),
+        }))
+    }
 }

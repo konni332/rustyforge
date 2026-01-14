@@ -56,8 +56,10 @@ fn run() -> Result<(), RustyForgeReport> {
         return Ok(());
     }
 
-    build(&cli, &manifest, &config)?;
-
+    let res = build(&cli, &manifest, &config)?;
+    if let CliCommand::Run { .. } = &cli.command {
+        execute::run(&cli, &res, &manifest)?;
+    }
     Ok(())
 }
 

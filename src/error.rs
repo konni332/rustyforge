@@ -67,6 +67,12 @@ pub enum CoreError {
 
     #[error("Already initialized")]
     AlreadyInitialized,
+
+    #[error("Could not find any executable matching: {name}")]
+    ExeNotFound { name: String },
+
+    #[error("Could not find any executable targets")]
+    NoExeFound,
 }
 
 impl From<std::io::Error> for Box<CoreError> {

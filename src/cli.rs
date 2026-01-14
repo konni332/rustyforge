@@ -42,6 +42,10 @@ pub enum CliCommand {
         #[command(flatten)]
         opts: BuildOptions,
 
+        /// Name of the binary
+        #[arg(long)]
+        exe: Option<String>,
+
         /// Arguments to pass to the program being executed
         #[arg(value_name = "ARGS", trailing_var_arg = true)]
         args: Vec<String>,

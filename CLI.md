@@ -54,7 +54,7 @@ rustyforge run [OPTIONS] -- [ARGS]
 **Options:**
 
 - Same as `build`.
-- `--bin <name>` is required if multiple binaries exist.
+- `--exe <name>` is recommended if multiple binaries exist, but the runner will default to the top most binary definition in the manifest.
 - All arguments after `--` are passed directly to the program.
 
 **Example:**
@@ -65,19 +65,6 @@ rustyforge run --release --bin nettool -- -p 8080
 
 ---
 
-### check
-
-Validate manifest and discovered sources without building.
-
-```
-rustyforge check
-```
-
-- Ensures all required fields in `[package]` exist.
-- Verifies that `[[bin]]` entries and library sources exist.
-- Checks ignore patterns and feature/define consistency.
-
----
 
 ### clean
 
@@ -111,30 +98,6 @@ rustyforge info [OPTIONS]
 
 ---
 
-### list-bins
-
-List all binaries in the project.
-
-```
-rustyforge list-bins
-```
-
-- Outputs binary names and entry paths.
-
----
-
-### list-features
-
-List all features defined in `[features]` and their associated defines.
-
-```
-rustyforge list-features
-```
-
-- Shows feature names and the `-D` defines they enable.
-- Useful to see available features before activating them in build/run.
-
----
 
 ## Notes
 

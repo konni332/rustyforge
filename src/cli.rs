@@ -51,9 +51,6 @@ pub enum CliCommand {
         args: Vec<String>,
     },
 
-    /// Validate the manifest and discovered sources without building
-    Check,
-
     /// Remove all build artifacts (e.g., target directory)
     Clean,
 

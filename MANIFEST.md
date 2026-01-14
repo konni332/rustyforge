@@ -141,3 +141,6 @@ logging = ["ENABLE_LOGGING"]
 - Useful for toggling functionality without editing multiple defines manually.
 - Can be extended in the future to support subpackages and dependencies.
 
+*For now features merely add additional defines. Making features optional and specifing features for subpackages, is planned for the dependency management system.*
+
+---

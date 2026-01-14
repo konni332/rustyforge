@@ -3,7 +3,7 @@ use std::{path::PathBuf, sync::Arc};
 use globset::GlobSet;
 use rustyforge_core::{
     BuildResult, Cli, CliCommand, CoreError, CoreResult, GlobalContext, ProjectInfo, ToolConfig,
-    internal_error, manifest::Manifest, shell::Verbosity, success, with_shell,
+    error, internal_error, manifest::Manifest, shell::Verbosity, success, with_shell,
 };
 
 /// Initializes RustyForge project in the current directory
@@ -110,7 +110,18 @@ pub fn run(cli: &Cli, build_res: &BuildResult, manifest: &Manifest) -> CoreResul
     };
 
     success!(&"Running", &executable.display());
-    cmd.status()?;
+    let status = cmd.status()?;
+    if status.success() {
+        success!(
+            &"Exited",
+            &format!("with exit code '{}'", status.code().unwrap_or_default())
+        );
+    } else {
+        error!(
+            &"Exited",
+            &format!("with exit code '{}'", status.code().unwrap_or_default())
+        );
+    }
     Ok(())
 }
 

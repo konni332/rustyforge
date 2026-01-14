@@ -15,6 +15,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 
 use crate::Cli;
 use crate::CoreError;
@@ -193,35 +195,49 @@ impl<'ctx> GlobalContext<'ctx> {
         Ok(false)
     }
     fn execute_compile_commands(&self, ccmds: &[(CannonicalCommand, u64)]) -> CoreResult<bool> {
-        let mut failed = false;
-        let mut pb = ProgressBar::new(ccmds.len());
-        for (ccmd, hash) in ccmds {
-            status!(&"Compiling".to_string(), &pb.render());
-            pb.next();
+        use std::sync::atomic::{AtomicBool, Ordering};
 
-            if self.cache.contains(hash) {
-                continue;
-            }
+        let failed = AtomicBool::new(false);
 
-            let mut cmd = std::process::Command::from(ccmd);
-            verbose!("running {}", display_command(&cmd));
-            let output = cmd.output()?;
-            if !output.status.success() {
-                let diagnostic = RustyForgeDiagnostic::BuildCommandFail {
-                    cmd: display_command(&cmd),
-                    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        self.pool.install(|| {
+            ccmds.par_iter().for_each(|(ccmd, hash)| {
+                if self.cache.contains(hash) {
+                    return;
+                }
+
+                let mut cmd = std::process::Command::from(ccmd);
+                verbose!("running {}", display_command(&cmd));
+                let output = match cmd.output() {
+                    Ok(o) => o,
+                    Err(e) => {
+                        failed.store(true, Ordering::SeqCst);
+                        with_shell(|sh| {
+                            sh.print_miette(&RustyForgeDiagnostic::BuildCommandFail {
+                                cmd: display_command(&cmd),
+                                stderr: format!("Failed to spawn process: {}", e),
+                            });
+                        });
+                        return;
+                    }
                 };
-                with_shell(|sh| {
-                    sh.print_miette(&diagnostic);
-                });
-                failed = true;
-            } else {
-                self.cache.insert(hash, PathBuf::new());
-            }
-        }
-        Ok(failed)
-    }
 
+                if !output.status.success() {
+                    failed.store(true, Ordering::SeqCst);
+                    let diagnostic = RustyForgeDiagnostic::BuildCommandFail {
+                        cmd: display_command(&cmd),
+                        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+                    };
+                    with_shell(|sh| {
+                        sh.print_miette(&diagnostic);
+                    });
+                } else {
+                    self.cache.insert(hash, PathBuf::new());
+                }
+            });
+        });
+
+        Ok(failed.load(Ordering::SeqCst))
+    }
     fn compile(&mut self, target: &Target) -> CoreResult<CompileResult> {
         let mut globs: Vec<Glob> = if let Some(patterns) = target.ignore.as_ref() {
             patterns

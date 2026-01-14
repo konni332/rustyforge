@@ -71,6 +71,7 @@ impl<'a> RunTimeConfig<'a> {
         let profile = resolve_profile(cli, manifest, config)?;
         let targets = resolve_targets(cli, manifest, config)?;
         let toolchain = resolve_toolchain(config)?;
+        toolchain.validate()?;
 
         Ok(Self {
             meta,

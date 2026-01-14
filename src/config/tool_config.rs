@@ -168,7 +168,7 @@ pub enum CppCompilerKind {
     #[serde(rename = "cl.exe")]
     Msvc, // Microsoft Visual C++
     #[serde(rename = "icpc")]
-    Icc, // Intel C++ Compiler
+    Icpc, // Intel C++ Compiler
 }
 
 impl ToolchainExecutable for CppCompilerKind {
@@ -189,7 +189,7 @@ impl ToolchainExecutable for CppCompilerKind {
                 }
             }
             CppCompilerKind::Msvc => "cl.exe",
-            CppCompilerKind::Icc => {
+            CppCompilerKind::Icpc => {
                 if cfg!(target_os = "windows") {
                     "icpc.exe"
                 } else {
@@ -203,7 +203,7 @@ impl ToolchainExecutable for CppCompilerKind {
         let candidates = [Self::Msvc, Self::Clangpp, Self::Gpp, Self::Icc];
 
         #[cfg(not(target_os = "windows"))]
-        let candidates = [Self::Clangpp, Self::Gpp, Self::Icc];
+        let candidates = [Self::Clangpp, Self::Gpp, Self::Icpc];
 
         for candidate in candidates.iter() {
             if which::which(candidate.executable()).is_ok() {

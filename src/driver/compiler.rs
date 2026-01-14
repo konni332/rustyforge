@@ -66,7 +66,7 @@ impl<'ctx> CompileContext<'ctx> {
             CppCompilerKind::Clangpp => self.build_cpp_commands::<Clang>(obj_dir),
             CppCompilerKind::Gpp => self.build_cpp_commands::<Gcc>(obj_dir),
             CppCompilerKind::Msvc => self.build_cpp_commands::<Msvc>(obj_dir),
-            CppCompilerKind::Icc => self.build_cpp_commands::<Intel>(obj_dir),
+            CppCompilerKind::Icpc => self.build_cpp_commands::<Intel>(obj_dir),
         }?;
         c_commands.extend(cpp_commands);
         Ok(CompileResult {

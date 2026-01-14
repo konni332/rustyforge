@@ -9,6 +9,7 @@ use crate::{
         ToolchainOption,
     },
     driver::runtime::RuntimeToolchain,
+    warn,
 };
 
 impl RuntimeToolchain {
@@ -34,6 +35,104 @@ impl RuntimeToolchain {
                 toolchain_label,
             )?,
         })
+    }
+    pub fn validate(&self) -> CoreResult<()> {
+        if !Self::is_compatible_c_cpp(self.c_compiler, self.cpp_compiler) {
+            return Err(Box::new(CoreError::ToolChain {
+                msg: format!(
+                    "Incompatible C/C++ compiler combination: {:?} + {:?}",
+                    self.c_compiler, self.cpp_compiler
+                ),
+                help: "Use compilers from the same family for LTO builds.".to_string(),
+            }));
+        }
+
+        if !Self::is_compatible_c_linker(self.c_compiler, self.linker) {
+            return Err(Box::new(CoreError::ToolChain {
+                msg: format!(
+                    "C compiler and linker are incompatible: {:?} + {:?}",
+                    self.c_compiler, self.linker
+                ),
+                help: "Ensure the linker matches the C compiler.".to_string(),
+            }));
+        }
+
+        if !Self::is_compatible_cpp_linker(self.cpp_compiler, self.linker) {
+            return Err(Box::new(CoreError::ToolChain {
+                msg: format!(
+                    "C++ compiler and linker are incompatible: {:?} + {:?}",
+                    self.cpp_compiler, self.linker
+                ),
+                help: "Ensure the linker matches the C++ compiler.".to_string(),
+            }));
+        }
+
+        if !Self::is_same_family(self.c_compiler, self.cpp_compiler) {
+            warn!(
+                &"Toolchain",
+                &"C and C++ compilers are from different families. LTO builds may fail."
+            );
+        }
+
+        if !Self::is_same_family_compiler_linker(self.c_compiler, self.cpp_compiler, self.linker) {
+            warn!(
+                &"Toolchain",
+                &"Compiler and linker families differ. LTO builds may fail."
+            );
+        }
+
+        Ok(())
+    }
+
+    fn is_compatible_c_cpp(c: CCompilerKind, cpp: CppCompilerKind) -> bool {
+        Self::compiler_family_c(c) == Self::compiler_family_cpp(cpp)
+    }
+
+    fn is_compatible_c_linker(c: CCompilerKind, linker: LinkerKind) -> bool {
+        Self::compiler_family_c(c) == Self::linker_family(linker)
+    }
+
+    fn is_compatible_cpp_linker(cpp: CppCompilerKind, linker: LinkerKind) -> bool {
+        Self::compiler_family_cpp(cpp) == Self::linker_family(linker)
+    }
+
+    fn is_same_family(c: CCompilerKind, cpp: CppCompilerKind) -> bool {
+        Self::compiler_family_c(c) == Self::compiler_family_cpp(cpp)
+    }
+
+    fn is_same_family_compiler_linker(
+        c: CCompilerKind,
+        cpp: CppCompilerKind,
+        linker: LinkerKind,
+    ) -> bool {
+        let family = Self::linker_family(linker);
+        Self::compiler_family_c(c) == family && Self::compiler_family_cpp(cpp) == family
+    }
+
+    fn compiler_family_c(c: CCompilerKind) -> &'static str {
+        match c {
+            CCompilerKind::Gcc => "gcc",
+            CCompilerKind::Clang => "clang",
+            CCompilerKind::Msvc => "msvc",
+            CCompilerKind::Icc => "intel",
+        }
+    }
+    fn compiler_family_cpp(cpp: CppCompilerKind) -> &'static str {
+        match cpp {
+            CppCompilerKind::Gpp => "gcc",
+            CppCompilerKind::Clangpp => "clang",
+            CppCompilerKind::Msvc => "msvc",
+            CppCompilerKind::Icpc => "intel",
+        }
+    }
+
+    fn linker_family(linker: LinkerKind) -> &'static str {
+        match linker {
+            LinkerKind::Gcc => "gcc",
+            LinkerKind::Clang => "clang",
+            LinkerKind::Msvc => "msvc",
+            LinkerKind::Lld => "clang",
+        }
     }
 }
 

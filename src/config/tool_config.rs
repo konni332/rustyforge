@@ -22,12 +22,11 @@ pub struct Toolchain {
     #[serde(rename = "c")]
     pub c_compiler: Option<ToolchainOption<CCompilerKind>>,
 
-    #[serde(rename = "cxx")]
+    #[serde(rename = "cpp")]
     pub cpp_compiler: Option<ToolchainOption<CppCompilerKind>>,
 
     pub linker: Option<ToolchainOption<LinkerKind>>,
 
-    #[serde(rename = "ar")]
     pub archiver: Option<ToolchainOption<ArchiverKind>>,
 }
 
@@ -72,7 +71,7 @@ impl ToolchainExecutable for ArchiverKind {
         let candidates = [Self::Lib, Self::LlvmAr];
 
         #[cfg(not(target_os = "windows"))]
-        let candidates = [Self::LlvmAr, Self::Ar];
+        let candidates = [Self::Ar, Self::LlvmAr];
 
         for candidate in candidates.iter() {
             if which::which(candidate.executable()).is_ok() {
@@ -267,10 +266,10 @@ impl ToolchainExecutable for LinkerKind {
     }
     fn discover() -> CoreResult<Self> {
         #[cfg(target_os = "windows")]
-        let candidates = [Self::Msvc, Self::Lld];
+        let candidates = [Self::Msvc, Self::Lld, Self::Clang, Self::Gcc];
 
         #[cfg(not(target_os = "windows"))]
-        let candidates = [Self::Lld, Self::Gcc, Self::Clang];
+        let candidates = [Self::Clang, Self::Gcc, Self::Lld];
 
         for candidate in candidates.iter() {
             if which::which(candidate.executable()).is_ok() {

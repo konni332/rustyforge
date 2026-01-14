@@ -3,6 +3,10 @@ name = "complex-project"
 version = "0.1.0"
 edition = "c11"
 
+[[bin]]
+name = "bin-a"
+entry = "src/main.c"
+ignore = ["tests"]
 
 [[bin]]
 name = "bin-b"

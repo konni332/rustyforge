@@ -82,8 +82,10 @@ pub fn project_info(
                 internal_error!("Failed to serialize runtime config: {}", e);
             }
         };
-
-        todo!("use json string somehow: {}", str);
+        let build_dir = ctx.get_build_dir();
+        std::fs::create_dir_all(&build_dir)?;
+        let path = build_dir.join("info.json");
+        std::fs::write(path, str)?;
     } else {
         println!("{info}");
     }

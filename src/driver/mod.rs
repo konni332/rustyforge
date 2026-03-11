@@ -352,6 +352,7 @@ impl<'ctx> GlobalContext<'ctx> {
     }
 }
 
+#[derive(Debug)]
 pub struct BuildResult {
     pub exe_paths: HashMap<String, PathBuf>,
     pub lib_path: Option<PathBuf>,

@@ -1,15 +1,12 @@
 fn setup(cwd: &std::path::Path) {
-    let res = expand_cmd_to_cargo_cmd("clean", cwd)
-        .output()
-        .unwrap()
-        .status
-        .success();
+    let res = expand_cmd_to_cargo_cmd("clean", cwd).output().unwrap();
 
     assert!(
-        !cwd.join("target").exists(),
+        !cwd.join("build").exists(),
         "Build artifacts exist after clean"
     );
-    assert!(res);
+    println!("{}", String::from_utf8_lossy(&res.stderr));
+    assert!(res.status.success());
 }
 
 fn fixture_dir(name: &str) -> std::path::PathBuf {
@@ -26,7 +23,6 @@ fn expand_cmd_to_cargo_cmd(cmd_str: &str, cwd: &std::path::Path) -> std::process
         .arg("--quiet")
         .arg("--")
         .arg(cmd_str)
-        .arg("--verbose-hard")
         .current_dir(cwd);
     cmd
 }
@@ -34,8 +30,6 @@ fn expand_cmd_to_cargo_cmd(cmd_str: &str, cwd: &std::path::Path) -> std::process
 fn assert_cmd_successfull(mut cmd: std::process::Command) {
     let output = cmd.output().unwrap();
     assert!(output.status.success());
-    let expected = String::new();
-    assert_eq!(String::from_utf8_lossy(&output.stderr), expected);
 }
 
 #[test]

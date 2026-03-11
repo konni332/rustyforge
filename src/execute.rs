@@ -133,7 +133,14 @@ fn determine_executable(
     manifest: &Manifest,
 ) -> CoreResult<PathBuf> {
     let path = if let Some(bin_name) = bin {
-        build_res.exe_paths.get(bin_name)
+        match build_res.exe_paths.get(bin_name) {
+            Some(path) => Some(path),
+            None => {
+                return Err(Box::new(CoreError::ExeNotFound {
+                    name: bin_name.into(),
+                }));
+            }
+        }
     } else {
         let first_in_manifest = manifest.bin.as_ref().and_then(|bins| bins.first());
         if let Some(first) = first_in_manifest {
@@ -142,11 +149,13 @@ fn determine_executable(
             return Err(Box::new(CoreError::NoExeFound));
         }
     };
+
     if let Some(path) = path {
         Ok(path.to_path_buf())
     } else {
-        Err(Box::new(CoreError::ExeNotFound {
-            name: bin.as_ref().map(|s| s.as_str()).unwrap_or("any").into(),
-        }))
+        match bin.as_ref() {
+            Some(name) => Err(Box::new(CoreError::ExeNotFound { name: name.into() })),
+            None => Err(Box::new(CoreError::NoExeFound)),
+        }
     }
 }
